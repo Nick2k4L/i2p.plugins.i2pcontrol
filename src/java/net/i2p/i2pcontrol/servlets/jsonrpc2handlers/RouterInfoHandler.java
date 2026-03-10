@@ -5,7 +5,10 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Request;
 import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
-
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import net.i2p.I2PAppContext;
 import net.i2p.data.Base32;
 import net.i2p.data.Hash;
@@ -125,6 +128,27 @@ public class RouterInfoHandler implements RequestHandler {
         if (inParams.containsKey("i2p.router.net.tunnels.participating")) {
             outParams.put("i2p.router.net.tunnels.participating", _context.tunnelManager().getParticipatingCount());
         }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
+            outParams.put("i2p.router.net.tunnels.exploratory.inbound",
+                    _context.tunnelManager().getFreeTunnelCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.outbound")) {
+            outParams.put("i2p.router.net.tunnels.exploratory.outbound",
+                    _context.tunnelManager().getOutboundTunnelCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.inbound")) {
+            outParams.put("i2p.router.net.tunnels.client.inbound",
+                    _context.tunnelManager().getInboundClientTunnelCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.outbound")) {
+            outParams.put("i2p.router.net.tunnels.client.outbound",
+                    _context.tunnelManager().getOutboundClientTunnelCount());
+        }
+
 
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             // Why max(-1, 0) is used I don't know, it is the implementation used in the router console.
