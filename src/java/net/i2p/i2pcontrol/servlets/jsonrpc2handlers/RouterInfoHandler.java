@@ -7,7 +7,10 @@ import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 
 import net.i2p.I2PAppContext;
+import net.i2p.data.Base32;
+import net.i2p.data.Hash;
 import net.i2p.data.router.RouterAddress;
+import net.i2p.data.router.RouterInfo;
 import net.i2p.router.CommSystemFacade;
 import net.i2p.router.Router;
 import net.i2p.router.RouterContext;
@@ -143,6 +146,27 @@ public class RouterInfoHandler implements RequestHandler {
         if (inParams.containsKey("i2p.router.netdb.isreseeding")) {
             outParams.put("i2p.router.netdb.isreseeding", Boolean.valueOf(System.getProperty("net.i2p.router.web.ReseedHandler.reseedInProgress")).booleanValue());
         }
+
+        if (inParams.containsKey("i2p.router.id")) {
+            RouterInfo ri = _context.router().getRouterInfo();
+            if (ri != null) {
+                Hash hash = ri.getIdentity().getHash();
+                outParams.put("i2p.router.id", hash.toBase64());
+            } else {
+                outParams.put("i2p.router.id", null);
+            }
+        }
+
+        if (inParams.containsKey("i2p.router.id.b32")) {
+            RouterInfo ri = _context.router().getRouterInfo();
+            if (ri != null) {
+                Hash hash = ri.getIdentity().getHash();
+                outParams.put("i2p.router.id.b32", Base32.encode(hash.getData()) + ".b32.i2p");
+            } else {
+                outParams.put("i2p.router.id.b32", null);
+            }
+        }
+
         return new JSONRPC2Response(outParams, req.getID());
     }
 
