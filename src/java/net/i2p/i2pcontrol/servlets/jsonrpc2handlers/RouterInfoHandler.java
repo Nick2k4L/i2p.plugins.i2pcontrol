@@ -167,6 +167,16 @@ public class RouterInfoHandler implements RequestHandler {
             }
         }
 
+        if (inParams.containsKey("i2p.router.clockskew")) {
+            RouterInfo ri = _context.router().getRouterInfo();
+            if (ri != null) {
+                long skew = _context.commSystem().getFramedAveragePeerClockSkew(33);
+                outParams.put("i2p.router.clockskew", skew);
+            } else {
+                outParams.put("i2p.router.clockskew", null);
+            }
+        }
+
         return new JSONRPC2Response(outParams, req.getID());
     }
 
