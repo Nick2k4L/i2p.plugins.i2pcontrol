@@ -238,6 +238,23 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
         }
 
+        if (inParams.containsKey("i2p.router.netdb.peers.list")) {
+            Set<Hash> allRouters = _context.netDb().getAllRouters();
+            List<String> peerList = new ArrayList<>();
+            for (Hash h : allRouters) peerList.add(h.toBase64());
+            outParams.put("i2p.router.netdb.peers.list", peerList);
+        }
+
+        if (inParams.containsKey("i2p.router.netdb.peers.info")) {
+            Set<Hash> allRouters = _context.netDb().getAllRouters();
+            List<String> peerInfoList = new ArrayList<>();
+            for (Hash h : allRouters) {
+                RouterInfo ri = _context.netDb().lookupRouterInfoLocally(h);
+                if (ri != null) peerInfoList.add(Base64.encode(ri.toByteArray()));
+            }
+            outParams.put("i2p.router.netdb.peers.info", peerInfoList);
+        }
+
         if (inParams.containsKey("i2p.router.netdb.activepeers.stats")) {
             List<Hash> active = _context.commSystem().getEstablished();
             List<Map<String, Object>> peerStats = new ArrayList<>();
