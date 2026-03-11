@@ -21,6 +21,7 @@ import net.i2p.router.RouterVersion;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
+import net.i2p.data.Base64;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -167,6 +168,19 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.netdb.activepeers.list", peerList);
         }
 
+        if (inParams.containsKey("i2p.router.netdb.activepeers.info")) {
+            List<Hash> active = _context.commSystem().getEstablished();
+            List<String> peerInfoList = new ArrayList<>();
+            for (Hash h : active) {
+                RouterInfo ri = _context.netDb().lookupRouterInfoLocally(h);
+                if (ri != null) {
+                    byte[] data = ri.toByteArray();
+                    peerInfoList.add(Base64.encode(data));
+                }
+            }
+            outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
+        }
+
 
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             // Why max(-1, 0) is used I don't know, it is the implementation used in the router console.
@@ -199,13 +213,13 @@ public class RouterInfoHandler implements RequestHandler {
             }
         }
 
-        if (inParams.containsKey("i2p.router.id.b32")) {
+        if (inParams.containsKey("i2p.router.info")) {
             RouterInfo ri = _context.router().getRouterInfo();
             if (ri != null) {
-                Hash hash = ri.getIdentity().getHash();
-                outParams.put("i2p.router.id.b32", Base32.encode(hash.getData()) + ".b32.i2p");
+                byte[] data = ri.toByteArray();
+                outParams.put("i2p.router.info", Base64.encode(data));
             } else {
-                outParams.put("i2p.router.id.b32", null);
+                outParams.put("i2p.router.info", null);
             }
         }
 
