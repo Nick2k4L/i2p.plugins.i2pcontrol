@@ -6,11 +6,9 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.i2p.I2PAppContext;
-import net.i2p.data.Base32;
+import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 import net.i2p.data.router.RouterAddress;
 import net.i2p.data.router.RouterInfo;
@@ -21,7 +19,6 @@ import net.i2p.router.RouterVersion;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
-import net.i2p.data.Base64;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,7 +37,6 @@ import java.util.Map;
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 public class RouterInfoHandler implements RequestHandler {
@@ -52,13 +48,10 @@ public class RouterInfoHandler implements RequestHandler {
         _context = ctx;
     }
 
-
-    // Reports the method names of the handled requests
     public String[] handledRequests() {
         return new String[] { "RouterInfo" };
     }
 
-    // Processes the requests
     public JSONRPC2Response process(JSONRPC2Request req, MessageContext ctx) {
         if (req.getMethod().equals("RouterInfo")) {
             return process(req);
@@ -183,7 +176,6 @@ public class RouterInfoHandler implements RequestHandler {
 
 
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
-            // Why max(-1, 0) is used I don't know, it is the implementation used in the router console.
             outParams.put("i2p.router.netdb.knownpeers", Math.max(_context.netDb().getKnownRouters() - 1, 0));
         }
 
@@ -225,15 +217,197 @@ public class RouterInfoHandler implements RequestHandler {
 
         if (inParams.containsKey("i2p.router.clockskew")) {
             RouterInfo ri = _context.router().getRouterInfo();
-            if (ri != null) {
-                long skew = _context.commSystem().getFramedAveragePeerClockSkew(33);
-                outParams.put("i2p.router.clockskew", skew);
-            } else {
-                outParams.put("i2p.router.clockskew", null);
+            outParams.put("i2p.router.clockskew", ri != null ? _context.commSystem().getFramedAveragePeerClockSkew(33) : null);
+        }
+
+        if (inParams.containsKey("i2p.router.netdb.activepeers.list")) {
+            List<Hash> active = _context.commSystem().getEstablished();
+            List<String> peerList = new ArrayList<>();
+            for (Hash h : active) peerList.add(h.toBase64());
+            outParams.put("i2p.router.netdb.activepeers.list", peerList);
+        }
+
+
+        if (inParams.containsKey("i2p.router.netdb.activepeers.info")) {
+            List<Hash> active = _context.commSystem().getEstablished();
+            List<String> peerInfoList = new ArrayList<>();
+            for (Hash h : active) {
+                RouterInfo ri = _context.netDb().lookupRouterInfoLocally(h);
+                if (ri != null) peerInfoList.add(Base64.encode(ri.toByteArray()));
             }
+            outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
+        }
+
+        if (inParams.containsKey("i2p.router.netdb.activepeers.stats")) {
+            List<Hash> active = _context.commSystem().getEstablished();
+            List<Map<String, Object>> peerStats = new ArrayList<>();
+            long now = System.currentTimeMillis();
+
+            for (Hash h : active) {
+                Map<String, Object> stat = new HashMap<>();
+                stat.put("hash", h.toBase64());
+                stat.put("country", _context.commSystem().getCountry(h));
+
+                // Peer software version from RouterInfo options map.
+                RouterInfo peerRi = _context.netDb().lookupRouterInfoLocally(h);
+                if (peerRi != null) {
+                    String v = peerRi.getOption("router.version");
+                    stat.put("version", v != null ? v : "unknown");
+                } else {
+                    stat.put("version", "unknown");
+                }
+
+                for (net.i2p.router.transport.Transport t : _context.commSystem().getTransports().values()) {
+                    if (!t.isEstablished(h)) continue;
+
+                    stat.put("activeTransport", t.getStyle());
+
+                    Object session = findSession(t, h);
+                    if (session == null) {
+                        stat.put("sessionError", "not found for " + t.getStyle());
+                        break;
+                    }
+
+                    String cls = session.getClass().getSimpleName();
+                    boolean isSSU = cls.equals("PeerState2") || cls.equals("PeerState");
+
+                    // --- shared fields ---
+                    stat.put("inbound",    reflectBoolean(session, "isInbound"));
+                    stat.put("ipv6",       reflectBoolean(session, "isIPv6"));
+                    stat.put("clockSkew",  reflectLong(session, "getClockSkew"));
+                    stat.put("rx",         reflectLong(session, "getMessagesReceived"));
+                    stat.put("tx",         reflectLong(session, "getMessagesSent"));
+                    stat.put("backlogged", reflectBoolean(session, "isBacklogged"));
+
+                    if (isSSU) {
+                        // uptime: now minus the epoch ms when the key was established
+                        long keyEstablished = reflectLong(session, "getKeyEstablishedTime");
+                        stat.put("uptime", keyEstablished > 0 ? now - keyEstablished : -1L);
+
+                        // idle: ms since last receive / last send
+                        long lastRx = reflectLong(session, "getLastReceiveTime");
+                        long lastTx = reflectLong(session, "getLastSendTime");
+                        stat.put("idleRx", lastRx > 0 ? now - lastRx : -1L);
+                        stat.put("idleTx", lastTx > 0 ? now - lastTx : -1L);
+
+                        // smoothed rates not available per-peer on SSU2
+                        stat.put("recvRateBps", -1);
+                        stat.put("sendRateBps", -1);
+
+                        // dup counts
+                        stat.put("dupRx", reflectLong(session, "getPacketsReceivedDuplicate"));
+                        stat.put("dupTx", reflectLong(session, "getPacketsRetransmitted"));
+
+                        stat.put("outboundQueue", reflectLong(session, "getOutboundMessageCount"));
+                    } else {
+                        // NTCP2 (NTCPConnection)
+                        stat.put("uptime", reflectLong(session, "getUptime"));
+
+                        // getTimeSinceReceive / getTimeSinceSend take a long arg (now)
+                        stat.put("idleRx", reflectLongWithLongArg(session, "getTimeSinceReceive", now));
+                        stat.put("idleTx", reflectLongWithLongArg(session, "getTimeSinceSend", now));
+
+                        // smoothed rates (exponential moving average, bytes/sec)
+                        stat.put("recvRateBps", reflectFloat(session, "getRecvRate"));
+                        stat.put("sendRateBps", reflectFloat(session, "getSendRate"));
+
+                        // dup not tracked per-peer on NTCP2
+                        stat.put("dupRx", -1);
+                        stat.put("dupTx", -1);
+
+                        stat.put("outboundQueue", reflectLong(session, "getOutboundQueueSize"));
+                    }
+
+                    break;
+                }
+
+                peerStats.add(stat);
+            }
+            outParams.put("i2p.router.netdb.activepeers.stats", peerStats);
         }
 
         return new JSONRPC2Response(outParams, req.getID());
+    }
+
+    private Object findSession(net.i2p.router.transport.Transport t, net.i2p.data.Hash h) {
+        // SSU/SSU2 — public getPeerState(Hash)
+        try {
+            java.lang.reflect.Method m = t.getClass().getMethod("getPeerState", net.i2p.data.Hash.class);
+            Object r = m.invoke(t, h);
+            if (r != null) return r;
+        } catch (Exception ignored) {}
+
+        // SSU/SSU2 — package-private getPeerState(Hash)
+        try {
+            java.lang.reflect.Method m = t.getClass().getDeclaredMethod("getPeerState", net.i2p.data.Hash.class);
+            m.setAccessible(true);
+            Object r = m.invoke(t, h);
+            if (r != null) return r;
+        } catch (Exception ignored) {}
+
+        // NTCP2 — iterate getPeers(), match via getRemotePeer().getHash()
+        try {
+            java.lang.reflect.Method getPeers = t.getClass().getMethod("getPeers");
+            java.util.Collection<?> peers = (java.util.Collection<?>) getPeers.invoke(t);
+            for (Object conn : peers) {
+                try {
+                    Object identity = conn.getClass().getMethod("getRemotePeer").invoke(conn);
+                    if (identity == null) continue;
+                    Object peerHash = identity.getClass().getMethod("getHash").invoke(identity);
+                    if (h.equals(peerHash)) return conn;
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+
+    private long reflectLong(Object obj, String... methodNames) {
+        for (String name : methodNames) {
+            try {
+                Object r = obj.getClass().getMethod(name).invoke(obj);
+                if (r instanceof Number) return ((Number) r).longValue();
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception ignored) {}
+            try {
+                java.lang.reflect.Method m = obj.getClass().getDeclaredMethod(name);
+                m.setAccessible(true);
+                Object r = m.invoke(obj);
+                if (r instanceof Number) return ((Number) r).longValue();
+            } catch (Exception ignored) {}
+        }
+        return -1L;
+    }
+
+    private long reflectLongWithLongArg(Object obj, String methodName, long arg) {
+        try {
+            Object r = obj.getClass().getMethod(methodName, long.class).invoke(obj, arg);
+            if (r instanceof Number) return ((Number) r).longValue();
+        } catch (Exception ignored) {}
+        try {
+            java.lang.reflect.Method m = obj.getClass().getDeclaredMethod(methodName, long.class);
+            m.setAccessible(true);
+            Object r = m.invoke(obj, arg);
+            if (r instanceof Number) return ((Number) r).longValue();
+        } catch (Exception ignored) {}
+        return -1L;
+    }
+
+    private float reflectFloat(Object obj, String methodName) {
+        try {
+            Object r = obj.getClass().getMethod(methodName).invoke(obj);
+            if (r instanceof Number) return ((Number) r).floatValue();
+        } catch (Exception ignored) {}
+        return -1f;
+    }
+
+    private boolean reflectBoolean(Object obj, String methodName) {
+        try {
+            Object r = obj.getClass().getMethod(methodName).invoke(obj);
+            if (r instanceof Boolean) return (Boolean) r;
+        } catch (Exception ignored) {}
+        return false;
     }
 
     private static enum NETWORK_STATUS {
@@ -254,7 +428,6 @@ public class RouterInfoHandler implements RequestHandler {
         ERROR_UDP_DISABLED_AND_TCP_UNSET,
     };
 
-    // Ripped out of SummaryHelper.java
     private NETWORK_STATUS getNetworkStatus() {
         if (_context.router().getUptime() > 60 * 1000
                 && (!_context.router().gracefulShutdownInProgress())
@@ -296,8 +469,8 @@ public class RouterInfoHandler implements RequestHandler {
                     return NETWORK_STATUS.ERROR_UDP_DISABLED_AND_TCP_UNSET;
                 else
                     return NETWORK_STATUS.WARN_FIREWALLED_WITH_UDP_DISABLED;
-            }
-            return NETWORK_STATUS.TESTING;
+                }
+                return NETWORK_STATUS.TESTING;
         }
     }
 }
