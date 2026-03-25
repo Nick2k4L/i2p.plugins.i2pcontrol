@@ -19,8 +19,6 @@ import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
 
-import java.util.HashMap;
-import java.util.Map;
 
 /*
  *  Copyright 2011 hottuna (dev@robertfoss.se)
@@ -252,6 +250,23 @@ public class RouterInfoHandler implements RequestHandler {
                 if (ri != null) peerInfoList.add(Base64.encode(ri.toByteArray()));
             }
             outParams.put("i2p.router.netdb.peers.info", peerInfoList);
+        }
+
+
+        // Address booking logic. Originally had 3 pre-existing functions,
+        // but they were all doing the same thing with different property keys and file names,
+        // so now we loop through a map of the 3 types.
+        Map<String, String> addressBooks = new LinkedHashMap<>();
+        addressBooks.put("i2p.router.addressbook.private.list", "privatehosts.txt");
+        addressBooks.put("i2p.router.addressbook.local.list",   "userhosts.txt");
+        addressBooks.put("i2p.router.addressbook.router.list",  "hosts.txt");
+
+        for (Map.Entry<String, String> book : addressBooks.entrySet()) {
+            if (inParams.containsKey(book.getKey())) {
+                Properties opts = new Properties();
+                opts.setProperty("list", book.getValue());
+                outParams.put(book.getKey(), extractDestinations(opts));
+            }
         }
 
         if (inParams.containsKey("i2p.router.netdb.activepeers.stats")) {
