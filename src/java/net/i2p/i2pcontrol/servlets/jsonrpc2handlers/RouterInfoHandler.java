@@ -5,9 +5,8 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Request;
 import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import net.i2p.data.Destination;
 import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 import net.i2p.data.router.RouterAddress;
@@ -344,6 +343,20 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         return new JSONRPC2Response(outParams, req.getID());
+    }
+
+
+    private List<Map<String, String>> extractDestinations(Properties opts) {
+        List<Map<String, String>> list = new ArrayList<>();
+        Map<String, Destination> entries = _context.namingService().getEntries(opts);
+
+        for (Map.Entry<String, Destination> entry : entries.entrySet()) {
+            Map<String, String> record = new HashMap<>();
+            record.put("hostname", entry.getKey());
+            record.put("destination", entry.getValue().toBase64());
+            list.add(record);
+        }
+        return list;
     }
 
     private Object findSession(net.i2p.router.transport.Transport t, net.i2p.data.Hash h) {
