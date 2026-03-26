@@ -6,6 +6,8 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 import java.util.*;
+
+import net.i2p.client.naming.NamingService;
 import net.i2p.data.Destination;
 import net.i2p.data.Base64;
 import net.i2p.data.Hash;
@@ -224,7 +226,6 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.netdb.activepeers.list", peerList);
         }
 
-
         if (inParams.containsKey("i2p.router.netdb.activepeers.info")) {
             List<Hash> active = _context.commSystem().getEstablished();
             List<String> peerInfoList = new ArrayList<>();
@@ -361,6 +362,7 @@ public class RouterInfoHandler implements RequestHandler {
     }
 
 
+
     private List<Map<String, String>> extractDestinations(Properties opts) {
         List<Map<String, String>> list = new ArrayList<>();
         Map<String, Destination> entries = _context.namingService().getEntries(opts);
@@ -368,6 +370,9 @@ public class RouterInfoHandler implements RequestHandler {
         for (Map.Entry<String, Destination> entry : entries.entrySet()) {
             Map<String, String> record = new HashMap<>();
             record.put("hostname", entry.getKey());
+            record.put("b32", entry.getValue().toBase32());
+            record.put("b64", entry.getValue().toBase64());
+            
             record.put("destination", entry.getValue().toBase64());
             list.add(record);
         }
