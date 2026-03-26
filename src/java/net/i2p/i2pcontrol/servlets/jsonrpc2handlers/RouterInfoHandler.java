@@ -53,6 +53,7 @@ public class RouterInfoHandler implements RequestHandler {
 
     public JSONRPC2Response process(JSONRPC2Request req, MessageContext ctx) {
         if (req.getMethod().equals("RouterInfo")) {
+
             return process(req);
         } else {
             // Method name not supported
@@ -372,7 +373,9 @@ public class RouterInfoHandler implements RequestHandler {
             record.put("hostname", entry.getKey());
             record.put("b32", entry.getValue().toBase32());
             record.put("b64", entry.getValue().toBase64());
-            
+            record.put("signing public key", entry.getValue().getSigningPublicKey().toString());
+            record.put("public key", entry.getValue().getPublicKey().toString());
+            record.put("certificate", entry.getValue().getCertificate().toString());
             record.put("destination", entry.getValue().toBase64());
             list.add(record);
         }
