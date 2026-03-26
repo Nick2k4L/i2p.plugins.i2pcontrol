@@ -5,9 +5,13 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Request;
 import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
 
-import net.i2p.client.naming.NamingService;
+import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.data.Base64;
 import net.i2p.data.Hash;
@@ -271,6 +275,21 @@ public class RouterInfoHandler implements RequestHandler {
             }
         }
 
+        if (inParams.containsKey("i2p.router.addressbook.published.list")) {
+            File base = new File(_context.getRouterDir(), "addressbook");
+            File published;
+            try {
+                published = new File(base, "../eepsite/docroot/hosts.txt").getCanonicalFile();
+            } catch (IOException e) {
+                outParams.put("i2p.router.addressbook.published.list", Collections.emptyList());
+                return new JSONRPC2Response(outParams, req.getID());
+            }
+
+
+            outParams.put("i2p.router.addressbook.published.list", extractPublishedDestinations(published));
+        }
+
+
         if (inParams.containsKey("i2p.router.netdb.activepeers.stats")) {
             List<Hash> active = _context.commSystem().getEstablished();
             List<Map<String, Object>> peerStats = new ArrayList<>();
@@ -381,6 +400,40 @@ public class RouterInfoHandler implements RequestHandler {
         }
         return list;
     }
+
+    private List<Map<String, String>> extractPublishedDestinations(File published) {
+        List<Map<String, String>> list = new ArrayList<>();
+        Properties props = new Properties();
+
+        try (FileInputStream fis = new FileInputStream(published)) {
+            props.load(fis);
+
+            for (Map.Entry<Object, Object> entry : props.entrySet()) {
+                String hostname = (String) entry.getKey();
+                String b64 = (String) entry.getValue();
+
+                try {
+                    Destination dest = new Destination(b64);
+                    Map<String, String> record = new HashMap<>();
+                    record.put("hostname", hostname);
+                    record.put("b32", dest.toBase32());
+                    record.put("b64", dest.toBase64());
+                    record.put("signing public key", dest.getSigningPublicKey().toString());
+                    record.put("public key", dest.getPublicKey().toString());
+                    record.put("certificate", dest.getCertificate().toString());
+                    record.put("destination", dest.toBase64());
+                    list.add(record);
+                } catch (DataFormatException dfe) {
+                    // skip bad entry
+                }
+            }
+        } catch (IOException ioe) {
+            // return empty list or handle error
+        }
+
+        return list;
+    }
+
 
     private Object findSession(net.i2p.router.transport.Transport t, net.i2p.data.Hash h) {
         // SSU/SSU2 — public getPeerState(Hash)
