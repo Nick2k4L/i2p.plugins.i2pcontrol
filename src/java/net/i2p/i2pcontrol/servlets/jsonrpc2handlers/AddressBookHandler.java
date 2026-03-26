@@ -84,7 +84,6 @@ public class AddressBookHandler implements RequestHandler {
 
             Destination destination;
 
-
             // base64 or i2p host?
             if (NamingService.isI2PHost(targetHost)) {
                 destination = namingService.lookup(targetHost.toLowerCase());
@@ -117,16 +116,24 @@ public class AddressBookHandler implements RequestHandler {
 
             Properties opts = new Properties();
             opts.setProperty("list", listFile);
+            Map<String, Object> outParams = new HashMap<>(4);
+
+
+            String message = " in %s addressbook".formatted(type);
+            // delete the hostname and destination from the address book
+            if (inParams.containsKey("Delete")){
+                boolean deletion = namingService.remove(hostname, destination, opts);
+                outParams.put("success", deletion);
+                outParams.put("message", deletion ? "Deleted %s".formatted(hostname) + message : "Failed to Delete %s".formatted(hostname) + message);
+
+                return new JSONRPC2Response(outParams, req.getID());
+            }
 
             // put the hostname and destination into the address book
             boolean success = namingService.put(hostname, destination, opts);
 
-
-            Map<String, Object> outParams = new HashMap<>(4);
-            outParams.put("Result", success ? "OK" : "Failed");
-            outParams.put("Destination", destination.toBase64());
-            outParams.put("Hostname", hostname);
-            outParams.put("Type", type);
+            outParams.put("success", success);
+            outParams.put("message", success ? "Added %s".formatted(hostname) + message : "Failed to Add %s".formatted(hostname) + message);
             return new JSONRPC2Response(outParams, req.getID());
         } else {
             // Method name not supported
