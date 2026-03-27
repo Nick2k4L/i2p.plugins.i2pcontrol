@@ -45,10 +45,12 @@ import net.i2p.router.transport.ntcp.NTCPTransport;
 public class RouterInfoHandler implements RequestHandler {
     private final JSONRPC2Helper _helper;
     private final RouterContext _context;
+    private final AddressBookFiles _files;
 
     public RouterInfoHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _helper = helper;
         _context = ctx;
+        _files = new AddressBookFiles(ctx);
     }
 
     public String[] handledRequests() {
@@ -275,18 +277,37 @@ public class RouterInfoHandler implements RequestHandler {
             }
         }
 
-        if (inParams.containsKey("i2p.router.addressbook.published.list")) {
-            File base = new File(_context.getRouterDir(), "addressbook");
-            File published;
+        if (inParams.containsKey("i2p.router.addressbook.config")) {
             try {
-                published = new File(base, "../eepsite/docroot/hosts.txt").getCanonicalFile();
+                File config = _files.getAddressBookConfigFile();
+                Map<String, Object> configInfo = new HashMap<>();
+                configInfo.put("path", config.getAbsolutePath());
+                configInfo.put("entries", AddressBookFiles.toStringMap(_files.loadAddressBookConfig()));
+                outParams.put("i2p.router.addressbook.config", configInfo);
+            } catch (IOException e) {
+                outParams.put("i2p.router.addressbook.config", Collections.emptyMap());
+            }
+        }
+
+        if (inParams.containsKey("i2p.router.addressbook.subscriptions")) {
+            try {
+                File subscriptions = _files.getSubscriptionsFile();
+                Map<String, Object> subscriptionInfo = new HashMap<>();
+                subscriptionInfo.put("path", subscriptions.getAbsolutePath());
+                subscriptionInfo.put("entries", _files.loadSubscriptions(subscriptions));
+                outParams.put("i2p.router.addressbook.subscriptions", subscriptionInfo);
+            } catch (IOException e) {
+                outParams.put("i2p.router.addressbook.subscriptions", Collections.emptyMap());
+            }
+        }
+
+        if (inParams.containsKey("i2p.router.addressbook.published.list")) {
+            try {
+                File published = _files.getPublishedAddressBook();
+                outParams.put("i2p.router.addressbook.published.list", extractPublishedDestinations(published));
             } catch (IOException e) {
                 outParams.put("i2p.router.addressbook.published.list", Collections.emptyList());
-                return new JSONRPC2Response(outParams, req.getID());
             }
-
-
-            outParams.put("i2p.router.addressbook.published.list", extractPublishedDestinations(published));
         }
 
 
@@ -403,10 +424,9 @@ public class RouterInfoHandler implements RequestHandler {
 
     private List<Map<String, String>> extractPublishedDestinations(File published) {
         List<Map<String, String>> list = new ArrayList<>();
-        Properties props = new Properties();
 
-        try (FileInputStream fis = new FileInputStream(published)) {
-            props.load(fis);
+        try {
+            Properties props = _files.loadPublishedEntries(published);
 
             for (Map.Entry<Object, Object> entry : props.entrySet()) {
                 String hostname = (String) entry.getKey();

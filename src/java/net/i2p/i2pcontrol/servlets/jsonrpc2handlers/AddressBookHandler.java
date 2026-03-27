@@ -9,12 +9,12 @@ import net.i2p.client.naming.NamingService;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.router.RouterContext;
-
+import net.i2p.i2pcontrol.servlets.jsonrpc2handlers.AddressBookFiles;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -25,6 +25,7 @@ public class AddressBookHandler implements RequestHandler {
 
     private final JSONRPC2Helper _helper;
     private final RouterContext _context;
+    private final AddressBookFiles _files;
     private static final String[] requiredArgs = {"Type", "Hostname", "Destination"};
     private static final Map<String, String> ADDRESS_BOOKS = new LinkedHashMap<>();
     private static final String PUBLISHED = "published";
@@ -38,6 +39,7 @@ public class AddressBookHandler implements RequestHandler {
     public AddressBookHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _context = ctx;
         _helper = helper;
+        _files = new AddressBookFiles(ctx);
     }
 
     // Reports the method names of the handled requests
@@ -48,10 +50,16 @@ public class AddressBookHandler implements RequestHandler {
     // Processes the requests
     public JSONRPC2Response process(JSONRPC2Request req, MessageContext ctx) {
         if (req.getMethod().equals("AddressBook")) {
+            Map<String, Object> inParams = req.getNamedParams();
+
+            // check if this is a file request immediately
+            JSONRPC2Response fileResponse = processFileRequest(req, inParams);
+            if (fileResponse != null)
+                return fileResponse;
+
             JSONRPC2Error err = _helper.validateParams(requiredArgs, req, JSONRPC2Helper.USE_NO_AUTH);
             if (err != null)
                 return new JSONRPC2Response(err, req.getID());
-            Map<String, Object> inParams = req.getNamedParams();
 
 
             // type: corresponds to address book type (private, local, router)
@@ -121,17 +129,17 @@ public class AddressBookHandler implements RequestHandler {
             // special case for published address book
             if (PUBLISHED.equals(type)) {
                 try {
-                    File published = getPublishedAddressBook();
+                    File published = _files.getPublishedAddressBook();
                     if (inParams.containsKey("Delete")) {
                         // delete the hostname and destination from the published address book
-                        boolean deletion = removePublishedEntry(published, hostname);
+                        boolean deletion = _files.removePublishedEntry(published, hostname);
                         outParams.put("success", deletion);
                         outParams.put("message", deletion ? "Deleted %s".formatted(hostname) + message : "Failed to Delete %s".formatted(hostname) + message);
                         return new JSONRPC2Response(outParams, req.getID());
                     }
 
                     // put the hostname and destination into the published address book
-                    boolean success = putPublishedEntry(published, hostname, destination);
+                    boolean success = _files.putPublishedEntry(published, hostname, destination);
                     outParams.put("success", success);
                     outParams.put("message", success ? "Added %s".formatted(hostname) + message : "Failed to Add %s".formatted(hostname) + message);
                     return new JSONRPC2Response(outParams, req.getID());
@@ -173,6 +181,48 @@ public class AddressBookHandler implements RequestHandler {
     }
 
 
+    // helps us process file requests
+    // related to the address book configuration and subscriptions,
+    // which are separate from the main address book entry management
+    private JSONRPC2Response processFileRequest(JSONRPC2Request req, Map<String, Object> inParams) {
+        try {
+            if (inParams.containsKey("SetConfig")) {
+                Object configObj = inParams.get("SetConfig");
+                if (!(configObj instanceof Map)) {
+                    return new JSONRPC2Response(JSONRPC2Error.INVALID_PARAMS, req.getID());
+                }
+                Properties props = _files.loadAddressBookConfig();
+                AddressBookFiles.applyConfigUpdates(props, (Map<?, ?>) configObj);
+                _files.storeAddressBookConfig(props);
+                Map<String, Object> outParams = new HashMap<>(3);
+                outParams.put("Path", _files.getAddressBookConfigFile().getAbsolutePath());
+                outParams.put("Result", "OK");
+                outParams.put("Config", new LinkedHashMap<String, String>((Map) props));
+                return new JSONRPC2Response(outParams, req.getID());
+            }
+
+            if (inParams.containsKey("SetSubscriptions")) {
+                List<String> subscriptions = AddressBookFiles.normalizeSubscriptions(inParams.get("SetSubscriptions"));
+                if (subscriptions == null) {
+                    return new JSONRPC2Response(JSONRPC2Error.INVALID_PARAMS, req.getID());
+                }
+                File file = _files.getSubscriptionsFile();
+                _files.storeSubscriptions(file, subscriptions);
+                Map<String, Object> outParams = new HashMap<>(3);
+                outParams.put("Path", file.getAbsolutePath());
+                outParams.put("Result", "OK");
+                outParams.put("Subscriptions", subscriptions);
+                return new JSONRPC2Response(outParams, req.getID());
+            }
+        } catch (IOException ioe) {
+            return new JSONRPC2Response(new JSONRPC2Error(
+                    JSONRPC2Error.INTERNAL_ERROR.getCode(),
+                    "Could not access address book configuration files."),
+                    req.getID());
+        }
+        return null;
+    }
+
     // Extracts the target part of the destination string handling url formats
     private static String extractDestinationTarget(String destination) {
         if (destination.contains("://")) {
@@ -182,60 +232,12 @@ public class AddressBookHandler implements RequestHandler {
                 if (host != null) {
                     return host;
                 }
-            } catch (java.net.URISyntaxException _) {
+            } catch (java.net.URISyntaxException e) {
+                // If the URI is not valid, we will just treat the whole string as the destination
 
             }
         }
 
         return destination;
-    }
-
-    // gets the published address book file, which is located at routerDir/../eepsite/docroot/hosts.txt
-    private File getPublishedAddressBook() throws IOException {
-        File base = new File(_context.getRouterDir(), "addressbook");
-        return new File(base, "../eepsite/docroot/hosts.txt").getCanonicalFile();
-    }
-
-    // loads all the published entries from the hosts.txt file
-    private static Properties loadPublishedEntries(File published) throws IOException {
-        Properties props = new Properties();
-        if (!published.exists()) {
-            return props;
-        }
-        try (FileInputStream fis = new FileInputStream(published)) {
-            props.load(fis);
-        }
-        return props;
-    }
-
-
-    // Once loaded, we can add entries to the published address book file
-    private static boolean putPublishedEntry(File published, String hostname, Destination destination) throws IOException {
-        Properties props = loadPublishedEntries(published);
-        props.setProperty(hostname, destination.toBase64());
-        return storePublishedEntries(published, props);
-    }
-
-
-    // Once loaded, we can remove entries from the published address book file
-    private static boolean removePublishedEntry(File published, String hostname) throws IOException {
-        Properties props = loadPublishedEntries(published);
-        Object removed = props.remove(hostname);
-        if (removed == null) {
-            return false;
-        }
-        return storePublishedEntries(published, props);
-    }
-
-    // Now we store our changes back to the file
-    private static boolean storePublishedEntries(File published, Properties props) throws IOException {
-        File parent = published.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            return false;
-        }
-        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(published)) {
-            props.store(fos, null);
-        }
-        return true;
     }
 }
