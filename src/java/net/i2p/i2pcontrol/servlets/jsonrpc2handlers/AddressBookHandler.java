@@ -9,6 +9,10 @@ import net.i2p.client.naming.NamingService;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.router.RouterContext;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +27,7 @@ public class AddressBookHandler implements RequestHandler {
     private final RouterContext _context;
     private static final String[] requiredArgs = {"Type", "Hostname", "Destination"};
     private static final Map<String, String> ADDRESS_BOOKS = new LinkedHashMap<>();
+    private static final String PUBLISHED = "published";
 
     static {
         ADDRESS_BOOKS.put("local", "userhosts.txt");
@@ -108,6 +113,36 @@ public class AddressBookHandler implements RequestHandler {
             }
 
 
+            Map<String, Object> outParams = new HashMap<>(4);
+
+            String message = " in %s addressbook".formatted(type);
+
+
+            // special case for published address book
+            if (PUBLISHED.equals(type)) {
+                try {
+                    File published = getPublishedAddressBook();
+                    if (inParams.containsKey("Delete")) {
+                        // delete the hostname and destination from the published address book
+                        boolean deletion = removePublishedEntry(published, hostname);
+                        outParams.put("success", deletion);
+                        outParams.put("message", deletion ? "Deleted %s".formatted(hostname) + message : "Failed to Delete %s".formatted(hostname) + message);
+                        return new JSONRPC2Response(outParams, req.getID());
+                    }
+
+                    // put the hostname and destination into the published address book
+                    boolean success = putPublishedEntry(published, hostname, destination);
+                    outParams.put("success", success);
+                    outParams.put("message", success ? "Added %s".formatted(hostname) + message : "Failed to Add %s".formatted(hostname) + message);
+                    return new JSONRPC2Response(outParams, req.getID());
+                } catch (IOException ioe) {
+                    return new JSONRPC2Response(new JSONRPC2Error(
+                            JSONRPC2Error.INTERNAL_ERROR.getCode(),
+                            "Could not access published address book file."),
+                            req.getID());
+                }
+            }
+
             // type of address book to use
             String listFile = ADDRESS_BOOKS.get(type);
             if (listFile == null) {
@@ -116,10 +151,7 @@ public class AddressBookHandler implements RequestHandler {
 
             Properties opts = new Properties();
             opts.setProperty("list", listFile);
-            Map<String, Object> outParams = new HashMap<>(4);
 
-
-            String message = " in %s addressbook".formatted(type);
             // delete the hostname and destination from the address book
             if (inParams.containsKey("Delete")){
                 boolean deletion = namingService.remove(hostname, destination, opts);
@@ -131,7 +163,6 @@ public class AddressBookHandler implements RequestHandler {
 
             // put the hostname and destination into the address book
             boolean success = namingService.put(hostname, destination, opts);
-
             outParams.put("success", success);
             outParams.put("message", success ? "Added %s".formatted(hostname) + message : "Failed to Add %s".formatted(hostname) + message);
             return new JSONRPC2Response(outParams, req.getID());
@@ -158,5 +189,53 @@ public class AddressBookHandler implements RequestHandler {
 
         return destination;
     }
-}
 
+    // gets the published address book file, which is located at routerDir/../eepsite/docroot/hosts.txt
+    private File getPublishedAddressBook() throws IOException {
+        File base = new File(_context.getRouterDir(), "addressbook");
+        return new File(base, "../eepsite/docroot/hosts.txt").getCanonicalFile();
+    }
+
+    // loads all the published entries from the hosts.txt file
+    private static Properties loadPublishedEntries(File published) throws IOException {
+        Properties props = new Properties();
+        if (!published.exists()) {
+            return props;
+        }
+        try (FileInputStream fis = new FileInputStream(published)) {
+            props.load(fis);
+        }
+        return props;
+    }
+
+
+    // Once loaded, we can add entries to the published address book file
+    private static boolean putPublishedEntry(File published, String hostname, Destination destination) throws IOException {
+        Properties props = loadPublishedEntries(published);
+        props.setProperty(hostname, destination.toBase64());
+        return storePublishedEntries(published, props);
+    }
+
+
+    // Once loaded, we can remove entries from the published address book file
+    private static boolean removePublishedEntry(File published, String hostname) throws IOException {
+        Properties props = loadPublishedEntries(published);
+        Object removed = props.remove(hostname);
+        if (removed == null) {
+            return false;
+        }
+        return storePublishedEntries(published, props);
+    }
+
+    // Now we store our changes back to the file
+    private static boolean storePublishedEntries(File published, Properties props) throws IOException {
+        File parent = published.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            return false;
+        }
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(published)) {
+            props.store(fos, null);
+        }
+        return true;
+    }
+}
