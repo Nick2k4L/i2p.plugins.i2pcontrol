@@ -7,7 +7,6 @@ import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
 
@@ -409,14 +408,19 @@ public class RouterInfoHandler implements RequestHandler {
         Map<String, Destination> entries = _context.namingService().getEntries(opts);
 
         for (Map.Entry<String, Destination> entry : entries.entrySet()) {
+            Properties stored = new Properties();
+            Destination dest = _context.namingService().lookup(entry.getKey(), opts, stored);
+            if (dest == null)
+                dest = entry.getValue();
             Map<String, String> record = new HashMap<>();
             record.put("hostname", entry.getKey());
-            record.put("b32", entry.getValue().toBase32());
-            record.put("b64", entry.getValue().toBase64());
-            record.put("signing public key", entry.getValue().getSigningPublicKey().toString());
-            record.put("public key", entry.getValue().getPublicKey().toString());
-            record.put("certificate", entry.getValue().getCertificate().toString());
-            record.put("destination", entry.getValue().toBase64());
+            record.put("b32", dest.toBase32());
+            record.put("b64", dest.getHash().toBase64());
+            record.put("signing public key", dest.getSigningPublicKey().toString());
+            record.put("public key", dest.getPublicKey().toString());
+            record.put("certificate", dest.getCertificate().toString());
+            record.put("destination", dest.toBase64());
+            record.put("added", stored.getProperty("a", ""));
             list.add(record);
         }
         return list;
@@ -429,13 +433,11 @@ public class RouterInfoHandler implements RequestHandler {
             Properties props = _files.loadPublishedEntries(published);
 
             for (Map.Entry<Object, Object> entry : props.entrySet()) {
-                String hostname = (String) entry.getKey();
-                String b64 = (String) entry.getValue();
 
                 try {
-                    Destination dest = new Destination(b64);
+                    Destination dest = new Destination((String) entry.getValue());
                     Map<String, String> record = new HashMap<>();
-                    record.put("hostname", hostname);
+                    record.put("hostname", entry.getKey().toString());
                     record.put("b32", dest.toBase32());
                     record.put("b64", dest.toBase64());
                     record.put("signing public key", dest.getSigningPublicKey().toString());
