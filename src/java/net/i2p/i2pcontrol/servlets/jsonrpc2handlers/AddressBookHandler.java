@@ -9,7 +9,6 @@ import net.i2p.client.naming.NamingService;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.router.RouterContext;
-import net.i2p.i2pcontrol.servlets.jsonrpc2handlers.AddressBookFiles;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -194,10 +193,10 @@ public class AddressBookHandler implements RequestHandler {
                 Properties props = _files.loadAddressBookConfig();
                 AddressBookFiles.applyConfigUpdates(props, (Map<?, ?>) configObj);
                 _files.storeAddressBookConfig(props);
-                Map<String, Object> outParams = new HashMap<>(3);
-                outParams.put("Path", _files.getAddressBookConfigFile().getAbsolutePath());
-                outParams.put("Result", "OK");
-                outParams.put("Config", new LinkedHashMap<String, String>((Map) props));
+                Map<String, Object> outParams = new HashMap<>(2);
+                String path = _files.getAddressBookConfigFile().getAbsolutePath();
+                outParams.put("success", true);
+                outParams.put("message", "Successfully modified: " + path);
                 return new JSONRPC2Response(outParams, req.getID());
             }
 
@@ -208,10 +207,10 @@ public class AddressBookHandler implements RequestHandler {
                 }
                 File file = _files.getSubscriptionsFile();
                 _files.storeSubscriptions(file, subscriptions);
-                Map<String, Object> outParams = new HashMap<>(3);
-                outParams.put("Path", file.getAbsolutePath());
-                outParams.put("Result", "OK");
-                outParams.put("Subscriptions", subscriptions);
+                Map<String, Object> outParams = new HashMap<>(2);
+                String path = file.getAbsolutePath();
+                outParams.put("success", true);
+                outParams.put("message", "Successfully modified: " + path);
                 return new JSONRPC2Response(outParams, req.getID());
             }
         } catch (IOException ioe) {
