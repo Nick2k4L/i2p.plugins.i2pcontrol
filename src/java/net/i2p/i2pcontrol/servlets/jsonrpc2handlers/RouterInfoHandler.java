@@ -21,6 +21,7 @@ import net.i2p.router.Router;
 import net.i2p.router.RouterContext;
 import net.i2p.router.RouterVersion;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
+import net.i2p.router.networkdb.reseed.ReseedChecker;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
 
@@ -197,7 +198,8 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("i2p.router.netdb.isreseeding")) {
-            outParams.put("i2p.router.netdb.isreseeding", Boolean.valueOf(System.getProperty("net.i2p.router.web.ReseedHandler.reseedInProgress")).booleanValue());
+            ReseedChecker _reseedChecker = _context.netDb().reseedChecker();
+            outParams.put("i2p.router.netdb.isreseeding", _reseedChecker.inProgress());
         }
 
         if (inParams.containsKey("i2p.router.id")) {
