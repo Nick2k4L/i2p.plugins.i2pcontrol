@@ -109,6 +109,14 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.status", getNetworkStatus().ordinal());
         }
 
+        if (inParams.containsKey("i2p.router.net.bw.used.inbound.total")){
+            outParams.put("i2p.router.net.bw.used.inbound.total", _context.bandwidthLimiter().getTotalAllocatedInboundBytes());
+        }
+
+        if (inParams.containsKey("i2p.router.net.bw.used.outbound.total")){
+            outParams.put("i2p.router.net.bw.used.outbound.total", _context.bandwidthLimiter().getTotalAllocatedOutboundBytes());
+        }
+
         if (inParams.containsKey("i2p.router.net.bw.inbound.1s")) {
             outParams.put("i2p.router.net.bw.inbound.1s", _context.bandwidthLimiter().getReceiveBps());
         }
