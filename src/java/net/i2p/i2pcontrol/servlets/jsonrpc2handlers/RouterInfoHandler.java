@@ -144,11 +144,6 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
         }
 
-        if (inParams.containsKey("i2p.router.net.tunnels.participating.lifetimeBandwidth")) {
-            outParams.put("i2p.router.net.tunnels.participating.lifetimeBandwidth",
-                          _tunnelInfoHelper.getParticipatingLifetimeBandwidth());
-        }
-
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.inbound",
                           _tunnelInfoHelper.getExploratoryInboundCount());
@@ -163,11 +158,6 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.tunnels.exploratory.info.list", _tunnelInfoHelper.getExploratoryInfo());
         }
 
-        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.lifetimeBandwidth")) {
-            outParams.put("i2p.router.net.tunnels.exploratory.lifetimeBandwidth",
-                          _tunnelInfoHelper.getExploratoryLifetimeBandwidth());
-        }
-
         if (inParams.containsKey("i2p.router.net.tunnels.client.inbound")) {
             outParams.put("i2p.router.net.tunnels.client.inbound",
                           _tunnelInfoHelper.getClientInboundCount());
@@ -180,11 +170,6 @@ public class RouterInfoHandler implements RequestHandler {
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.info.list")) {
             outParams.put("i2p.router.net.tunnels.client.info.list", _tunnelInfoHelper.getClientInfo());
-        }
-
-        if (inParams.containsKey("i2p.router.net.tunnels.client.lifetimeBandwidth")) {
-            outParams.put("i2p.router.net.tunnels.client.lifetimeBandwidth",
-                          _tunnelInfoHelper.getClientLifetimeBandwidth());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.inbound.list")) {

@@ -49,13 +49,6 @@ final class TunnelInfoHelper {
         return participatingTunnels;
     }
 
-    Map<String, Object> getParticipatingLifetimeBandwidth() {
-        long processed = getParticipatingLifetimeProcessed();
-        Map<String, Object> lifetime = new HashMap<>();
-        lifetime.put("KB", processed);
-        return lifetime;
-    }
-
     int getExploratoryInboundCount() {
         return _context.tunnelManager().getFreeTunnelCount();
     }
@@ -73,12 +66,6 @@ final class TunnelInfoHelper {
         return exploratoryTunnels;
     }
 
-    Map<String, Object> getExploratoryLifetimeBandwidth() {
-        TunnelPool inboundExploratory = _context.tunnelManager().getInboundExploratoryPool();
-        TunnelPool outboundExploratory = _context.tunnelManager().getOutboundExploratoryPool();
-        return extractLifetimeBandwidth(inboundExploratory, outboundExploratory);
-    }
-
     int getClientInboundCount() {
         return _context.tunnelManager().getInboundClientTunnelCount();
     }
@@ -91,18 +78,6 @@ final class TunnelInfoHelper {
         List<Map<String, Object>> clientTunnels = extractClientTunnels(true);
         clientTunnels.addAll(extractClientTunnels(false));
         return clientTunnels;
-    }
-
-    Map<String, Object> getClientLifetimeBandwidth() {
-        long inboundProcessed = 0;
-        long outboundProcessed = 0;
-        for (TunnelPool pool : _context.tunnelManager().getInboundClientPools().values()) {
-            inboundProcessed += pool.getLifetimeProcessed();
-        }
-        for (TunnelPool pool : _context.tunnelManager().getOutboundClientPools().values()) {
-            outboundProcessed += pool.getLifetimeProcessed();
-        }
-        return extractLifetimeBandwidth(inboundProcessed, outboundProcessed);
     }
 
     List<Map<String, Object>> getClientInboundList() {
@@ -228,36 +203,6 @@ final class TunnelInfoHelper {
         return tunnelInfo;
     }
 
-    private Map<String, Object> extractLifetimeBandwidth(TunnelPool inboundPool, TunnelPool outboundPool) {
-        long inboundProcessed = inboundPool != null ? inboundPool.getLifetimeProcessed() : 0;
-        long outboundProcessed = outboundPool != null ? outboundPool.getLifetimeProcessed() : 0;
-        return extractLifetimeBandwidth(inboundProcessed, outboundProcessed);
-    }
-
-    private Map<String, Object> extractLifetimeBandwidth(long inboundProcessed, long outboundProcessed) {
-        Map<String, Object> lifetime = new HashMap<>();
-        lifetime.put("inboundKB", inboundProcessed);
-        lifetime.put("outboundKB", outboundProcessed);
-        return lifetime;
-    }
-
-    private long getParticipatingLifetimeProcessed() {
-        long processed = 0;
-        net.i2p.stat.RateStat rate = _context.statManager().getRate("tunnel.participatingMessageCount");
-        if (rate != null) {
-            net.i2p.stat.Rate tenMinuteRate = rate.getRate(10 * 60 * 1000);
-            if (tenMinuteRate != null) {
-                processed = (long) tenMinuteRate.getLifetimeTotalValue();
-            }
-        }
-
-        for (HopConfig config : _context.tunnelDispatcher().listParticipatingTunnels()) {
-            if (config.getProcessedMessagesCount() > 0) {
-                processed += config.getRecentMessagesCount();
-            }
-        }
-        return processed;
-    }
 
     private String getTunnelPoolName(TunnelPool pool) {
         String nickname = pool.getSettings().getDestinationNickname();
