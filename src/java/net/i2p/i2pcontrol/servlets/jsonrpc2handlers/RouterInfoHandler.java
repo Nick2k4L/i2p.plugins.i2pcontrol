@@ -9,13 +9,11 @@ import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.data.Base64;
 import net.i2p.data.Hash;
-import net.i2p.data.TunnelId;
 import net.i2p.data.router.RouterAddress;
 import net.i2p.data.router.RouterInfo;
 import net.i2p.router.*;
@@ -23,9 +21,6 @@ import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.networkdb.reseed.ReseedChecker;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
-import net.i2p.router.tunnel.HopConfig;
-import net.i2p.router.tunnel.pool.TunnelPool;
-import net.i2p.router.tunnel.pool.TunnelPoolManager;
 
 
 /*
@@ -48,11 +43,13 @@ public class RouterInfoHandler implements RequestHandler {
     private final JSONRPC2Helper _helper;
     private final RouterContext _context;
     private final AddressBookFiles _files;
+    private final TunnelInfoHelper _tunnelInfoHelper;
 
     public RouterInfoHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _helper = helper;
         _context = ctx;
         _files = new AddressBookFiles(ctx);
+        _tunnelInfoHelper = new TunnelInfoHelper(ctx);
     }
 
     public String[] handledRequests() {
@@ -140,87 +137,65 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.participating")) {
-            outParams.put("i2p.router.net.tunnels.participating", _context.tunnelManager().getParticipatingCount());
+            outParams.put("i2p.router.net.tunnels.participating", _tunnelInfoHelper.getParticipatingCount());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.participating.info")) {
-            List<Map<String, Object>> participatingTunnels = new ArrayList<>();
-            int inactiveCount = 0;
-            Map<String, Object> inactiveInfo = new HashMap<>();
+            outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
+        }
 
-            List<HopConfig> hopConfigs = _context.tunnelDispatcher().listParticipatingTunnels();
-
-            for (HopConfig config: hopConfigs) {
-                // this means it is inactive
-                Map<String, Object> tunnelInfo = new HashMap<>();
-                if (config.getProcessedMessagesCount() <= 0) {
-                    inactiveCount++;
-                    continue;
-                }
-                long receiveTunnelId = config.getReceiveTunnelId();
-                long sendTunnelId = config.getSendTunnelId();
-                Hash receiveFrom = config.getReceiveFrom();
-                Hash sendTo = config.getSendTo();
-                tunnelInfo.put("peerHashFrom", receiveFrom != null ? receiveFrom.toBase64() : null);
-                tunnelInfo.put("peerHashTo", sendTo != null ? sendTo.toBase64() : null);
-                tunnelInfo.put("receiveTunnelId", receiveTunnelId);
-                tunnelInfo.put("sendTunnelId", sendTunnelId);
-                tunnelInfo.put("tunnelExpiration", config.getExpiration());
-                // Type of tunnel
-                if (sendTo == null) {
-                    tunnelInfo.put("type", "Outbound Endpoint");
-                } else if (receiveFrom == null) {
-                    tunnelInfo.put("type", "Inbound Gateway");
-                } else {
-                    tunnelInfo.put("type", "participant");
-                }
-
-                participatingTunnels.add(tunnelInfo);
-            }
-            inactiveInfo.put("inactiveCount", inactiveCount);
-            participatingTunnels.add(inactiveInfo);
-            outParams.put("i2p.router.net.tunnels.participating.info", participatingTunnels);
+        if (inParams.containsKey("i2p.router.net.tunnels.participating.lifetimeBandwidth")) {
+            outParams.put("i2p.router.net.tunnels.participating.lifetimeBandwidth",
+                          _tunnelInfoHelper.getParticipatingLifetimeBandwidth());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.inbound",
-                    _context.tunnelManager().getFreeTunnelCount());
+                          _tunnelInfoHelper.getExploratoryInboundCount());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.outbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.outbound",
-                    _context.tunnelManager().getOutboundTunnelCount());
+                          _tunnelInfoHelper.getExploratoryOutboundCount());
         }
 
-        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound.list")) {
-            TunnelPool ei = _context.tunnelManager().getInboundExploratoryPool();
-            outParams.put("i2p.router.net.tunnels.exploratory.inbound.list",
-                    0);
+        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.info.list")) {
+            outParams.put("i2p.router.net.tunnels.exploratory.info.list", _tunnelInfoHelper.getExploratoryInfo());
         }
 
-        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.outbound.list")) {
-            TunnelPool eo = _context.tunnelManager().getOutboundExploratoryPool();
-            outParams.put("i2p.router.net.tunnels.exploratory.outbound.list",
-                    0);
+        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.lifetimeBandwidth")) {
+            outParams.put("i2p.router.net.tunnels.exploratory.lifetimeBandwidth",
+                          _tunnelInfoHelper.getExploratoryLifetimeBandwidth());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.inbound")) {
             outParams.put("i2p.router.net.tunnels.client.inbound",
-                    _context.tunnelManager().getInboundClientTunnelCount());
+                          _tunnelInfoHelper.getClientInboundCount());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.outbound")) {
             outParams.put("i2p.router.net.tunnels.client.outbound",
-                    _context.tunnelManager().getOutboundClientTunnelCount());
+                          _tunnelInfoHelper.getClientOutboundCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.info.list")) {
+            outParams.put("i2p.router.net.tunnels.client.info.list", _tunnelInfoHelper.getClientInfo());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.lifetimeBandwidth")) {
+            outParams.put("i2p.router.net.tunnels.client.lifetimeBandwidth",
+                          _tunnelInfoHelper.getClientLifetimeBandwidth());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.inbound.list")) {
-            outParams.put("i2p.router.net.tunnels.client.inbound.list",0);
-        }
-        if (inParams.containsKey("i2p.router.net.tunnels.client.outbound.list")) {
-            outParams.put("i2p.router.net.tunnels.client.outbound.list",0);
+            outParams.put("i2p.router.net.tunnels.client.inbound.list",
+                          _tunnelInfoHelper.getClientInboundList());
         }
 
+        if (inParams.containsKey("i2p.router.net.tunnels.client.outbound.list")) {
+            outParams.put("i2p.router.net.tunnels.client.outbound.list",
+                          _tunnelInfoHelper.getClientOutboundList());
+        }
 
             if (inParams.containsKey("i2p.router.netdb.peers")) {
             Set<Hash> allRouters = _context.netDb().getAllRouters();
