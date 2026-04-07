@@ -13,6 +13,7 @@ import net.i2p.router.RouterContext;
 import net.i2p.router.TunnelInfo;
 import net.i2p.router.tunnel.HopConfig;
 import net.i2p.router.tunnel.pool.TunnelPool;
+import net.i2p.stat.RateStat;
 
 final class TunnelInfoHelper {
     private static final String ROLE_INBOUND_GATEWAY = "inbound gateway";
@@ -45,7 +46,11 @@ final class TunnelInfoHelper {
 
         Map<String, Object> inactiveInfo = new HashMap<>();
         inactiveInfo.put("inactiveCount", inactiveCount);
+        Map<String, Object> totalInfo = new HashMap<>();
+        RateStat rs = _context.statManager().getRate("tunnel.participatingMessageCount");
+        totalInfo.put("bandwidth", rs != null ? rs.getRate(10*60*1000).getLifetimeTotalValue() : 0L);
         participatingTunnels.add(inactiveInfo);
+        participatingTunnels.add(totalInfo);
         return participatingTunnels;
     }
 
