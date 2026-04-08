@@ -16,6 +16,8 @@ import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 import net.i2p.data.router.RouterAddress;
 import net.i2p.data.router.RouterInfo;
+import net.i2p.i2ptunnel.TunnelController;
+import net.i2p.i2ptunnel.TunnelControllerGroup;
 import net.i2p.router.*;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.networkdb.reseed.ReseedChecker;
@@ -142,6 +144,16 @@ public class RouterInfoHandler implements RequestHandler {
 
         if (inParams.containsKey("i2p.router.net.tunnels.participating.info")) {
             outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel")){
+            TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
+            //TunnelController controller = group.getControllers().get(0);
+            List<String> dests = new ArrayList<>();
+            for (TunnelController tc : group.getControllers()) {
+                dests.add(tc.getDescription());
+            }
+            outParams.put("i2p.router.net.tunnels.i2ptunnel", dests);
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
