@@ -146,14 +146,35 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
         }
 
+
+        // Get
         if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel")){
             TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
             //TunnelController controller = group.getControllers().get(0);
-            List<String> dests = new ArrayList<>();
+            List<Map<String, Object>> info = new ArrayList<>();
             for (TunnelController tc : group.getControllers()) {
-                dests.add(tc.getDescription());
+                Map<String, Object> map = new HashMap<>();
+                if (tc.isClient()) {
+                    map.put("name", tc.getName());
+                    map.put("type", tc.getType());
+                    map.put("interface", tc.getListenOnInterface());
+                    map.put("port", tc.getListenPort());
+                    if (tc.getIsStandby()) {
+                        map.put("status",  "standby");
+                    }
+                    else if (tc.getIsRunning()){
+                        map.put("status",  "running");
+                    }
+                    else{
+                        map.put("status",  "stopped");
+                    }
+                    map.put("description", tc.getDescription());
+                    map.put("destination", tc.getDestination());
+
+                    info.add(map);
+                }
             }
-            outParams.put("i2p.router.net.tunnels.i2ptunnel", dests);
+            outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
