@@ -99,7 +99,6 @@ final class TunnelInfoHelper {
                                               : _context.tunnelManager().getOutboundClientPools();
         List<TunnelPool> sortedPools = new ArrayList<>(pools.values());
         sortedPools.sort((left, right) -> getTunnelPoolName(left).compareTo(getTunnelPoolName(right)));
-
         for (TunnelPool pool : sortedPools) {
             list.addAll(extractTunnelPool(pool));
         }
