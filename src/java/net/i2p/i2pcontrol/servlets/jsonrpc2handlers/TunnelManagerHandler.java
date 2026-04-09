@@ -155,13 +155,14 @@ public class TunnelManagerHandler implements RequestHandler {
                         outParams.put("status", "success - restarting tunnel " + controllerName);
                         return new JSONRPC2Response(outParams, req.getID());
                     case "delete":
+                        _group.removeController(controller);
                         try {
                             _group.removeConfig(controller);
                         } catch (Exception e) {
                             outParams.put("status", "error - failed to remove config for tunnel " + controllerName);
                             return new JSONRPC2Response(outParams, req.getID());
                         }
-                        outParams.put("status", "success - deleting tunnel " + controllerName);
+                        outParams.put("status", "success - deleting tunnel - " + controllerName);
                         return new JSONRPC2Response(outParams, req.getID());
 
                     default:
