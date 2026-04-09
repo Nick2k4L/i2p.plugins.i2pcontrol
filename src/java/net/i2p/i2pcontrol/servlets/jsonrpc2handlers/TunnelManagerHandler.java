@@ -12,6 +12,7 @@ import net.i2p.router.RouterContext;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 public class TunnelManagerHandler implements RequestHandler {
     private final JSONRPC2Helper _helper;
@@ -77,11 +78,26 @@ public class TunnelManagerHandler implements RequestHandler {
             if (inParams.containsKey("Delete")){
                 if (controller != null){
                     List<String> msg = _group.removeController(controller);
+                    try {
+                        _group.removeConfig(controller);
+                    } catch (Exception e) {
+                        outParams.put("status", "error - failed to remove config for tunnel " + controller.getName());
+                        return new JSONRPC2Response(outParams, req.getID());
+                    }
                     outParams.put("status", "success - " + action);
                     outParams.put("results", msg);
                     return new JSONRPC2Response(outParams, req.getID());
                 }
 
+            }
+
+            // Can use this to display config options for a tunnel.
+            // Exposes a lot of information about a tunnel.
+            if (inParams.containsKey("Config")){
+                Properties config = controller.getConfig("");
+                outParams.put("status", "success - " + action);
+                outParams.put("results", config);
+                return new JSONRPC2Response(outParams, req.getID());
             }
 
             if (action.equals("start")) {
@@ -118,6 +134,14 @@ public class TunnelManagerHandler implements RequestHandler {
             default:
                 return null;
         }
+    }
+
+    // Creation. We need to create different types of tunnels, so we need to take in a type + parameters
+    // could we use some type of DS here? we will see
+
+    private void TestGetConfig(TunnelController controller, String type) {
+
+
     }
 
 
