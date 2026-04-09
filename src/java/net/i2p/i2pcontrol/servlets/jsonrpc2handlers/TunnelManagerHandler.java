@@ -25,7 +25,6 @@ public class TunnelManagerHandler implements RequestHandler {
     public TunnelManagerHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _context = ctx;
         _helper = helper;
-        _group = TunnelControllerGroup.getInstance(ctx);
     }
 
     public String[] handledRequests() {return new String[]{"TunnelManager"};}
@@ -53,7 +52,7 @@ public class TunnelManagerHandler implements RequestHandler {
 
             if (_group == null) {
                 // Still null I2P tunnel manager isn't ready yet
-                outParams.put("status", "error - tunnel controller not available");
+                outParams.put("status", "error - tunnel controller not available, group is null");
                 return new JSONRPC2Response(outParams, req.getID());
             }
 
@@ -70,19 +69,33 @@ public class TunnelManagerHandler implements RequestHandler {
             }
 
 
+
+
             /// ---- Methods per name ---- \\\
-            TunnelController controller = findTunnelControllerByName(name);
+            TunnelController controller = findTunnelControllerByName(name.trim());
+
+            if (inParams.containsKey("Delete")){
+                if (controller != null){
+                    List<String> msg = _group.removeController(controller);
+                    outParams.put("status", "success - " + action);
+                    outParams.put("results", msg);
+                    return new JSONRPC2Response(outParams, req.getID());
+                }
+
+            }
 
             if (action.equals("start")) {
                 if (controller != null) {
                     controller.startTunnel();
                     outParams.put("status", "success - starting tunnel " + controller.getName());
+                    return new JSONRPC2Response(outParams, req.getID());
                 }
             }
             else {
                 if (controller != null) {
                     controller.stopTunnel();
                     outParams.put("status", "success - stopping tunnel " + controller.getName());
+                    return new JSONRPC2Response(outParams, req.getID());
                 }
             }
             outParams.put("status", "error - tunnel controller not available");
