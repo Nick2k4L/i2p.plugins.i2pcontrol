@@ -46,6 +46,7 @@ public class TunnelManagerHandler implements RequestHandler {
 
 
 
+
             if (_group == null) {
                 _group = TunnelControllerGroup.getInstance(_context); // retry getting it
             }
@@ -55,6 +56,21 @@ public class TunnelManagerHandler implements RequestHandler {
                 outParams.put("status", "error - tunnel controller not available");
                 return new JSONRPC2Response(outParams, req.getID());
             }
+
+
+            if (inParams.containsKey("All")){
+                List<String> results = actionToAll(action);
+                if (results != null) {
+                    outParams.put("status", "success - " + action);
+                    outParams.put("results", results);
+                    return new JSONRPC2Response(outParams, req.getID());
+                }
+                outParams.put("status", "error - no action");
+                return new JSONRPC2Response(outParams, req.getID());
+            }
+
+
+            /// ---- Methods per name ---- \\\
             TunnelController controller = findTunnelControllerByName(name);
 
             if (action.equals("start")) {
@@ -75,6 +91,22 @@ public class TunnelManagerHandler implements RequestHandler {
             return new JSONRPC2Response(JSONRPC2Error.METHOD_NOT_FOUND, req.getID());
         }
     }
+
+    // adds an action to all of them
+    private List<String> actionToAll(String action) {
+        // this type of switch failed since we are on a older version JDK 8
+        switch (action) {
+            case "start":
+                return _group.startAllControllers();
+            case "stop":
+                return _group.stopAllControllers();
+            case "restart":
+                return _group.restartAllControllers();
+            default:
+                return null;
+        }
+    }
+
 
     // finds a controller by its name. Allows us to do actions to said controller
     private TunnelController findTunnelControllerByName(String name) {
