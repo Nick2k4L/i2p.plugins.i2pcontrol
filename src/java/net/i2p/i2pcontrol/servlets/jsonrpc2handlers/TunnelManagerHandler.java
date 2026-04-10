@@ -201,11 +201,15 @@ public class TunnelManagerHandler implements RequestHandler {
     }
 
 
+    // TODO: each advanced configuration has some shared
+    //  field to it meaning we can break up this function into reusable pieces
+    //  allow us to implement logic faster between other client / services types
+    //  some I have seen: tunnel length options, tunnel quantity for example.
 
-    // this creates us our socks client with parameters
-    // still undergoing testing at the moment, yet base creation works perfect
-    // testing advanced configuration still needs to happen
-    private List<String> createSocksClient(Map<String, Object> inParams, String type) throws IOException {
+
+    // TODO: Non advanced - Name, Description, Port, auto start
+
+    private String getName(Map<String, Object> inParams) {
         String name = (String) inParams.get("Name");
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Name is required");
@@ -213,7 +217,10 @@ public class TunnelManagerHandler implements RequestHandler {
         if (findTunnelControllerByName(name.trim()) != null) {
             throw new IllegalArgumentException("tunnel " + name.trim() + " already exists");
         }
+        return name;
+    }
 
+    private int getPort(Map<String, Object> inParams) {
         Object portObj = inParams.get("Port");
         if (portObj == null) {
             throw new IllegalArgumentException("Port is required");
@@ -222,9 +229,49 @@ public class TunnelManagerHandler implements RequestHandler {
         if (port <= 0 || port > 65535) {
             throw new IllegalArgumentException("Port must be between 1 and 65535");
         }
+        return port;
+    }
 
-        boolean shared = Boolean.TRUE.equals(inParams.get("Shared"));
-        boolean startOnLoad = Boolean.TRUE.equals(inParams.get("StartOnLoad"));
+    private boolean getShared(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("Shared"));
+    }
+
+    private boolean getStartOnLoad(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("StartOnLoad"));
+    }
+
+    private String getDescription(Map<String, Object> inParams){
+        return (String) inParams.get("Description");
+    }
+
+    private String getReachableBy(Map<String, Object> inParams) {
+        return (String) inParams.get("ReachableBy");
+
+    }
+
+    // all methods will use this, so extract it out into a function & change this name or break it up
+    private void setNamePortSharedStartOnLoadDescriptionInterface(Properties config, Map<String, Object> inParams, String type) {
+        String name = getName(inParams);
+        int port = getPort(inParams);
+        boolean shared = getShared(inParams);
+        boolean startOnLoad = getStartOnLoad(inParams);
+        String reachableBy = getReachableBy(inParams);
+        config.setProperty(TunnelController.PROP_TYPE, type);
+        config.setProperty(TunnelController.PROP_INTFC, reachableBy != null ? reachableBy : "127.0.0.1");
+        config.setProperty(TunnelController.PROP_NAME, name.trim());
+        config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(port));
+        config.setProperty(TunnelController.PROP_SHARED, Boolean.toString(shared));
+        config.setProperty(TunnelController.PROP_START, Boolean.toString(startOnLoad));
+        String description = getDescription(inParams);
+        if (description != null)
+            config.setProperty(TunnelController.PROP_DESCR, description);
+    }
+
+
+    // this creates us our socks client with parameters
+    // still undergoing testing at the moment, yet base creation works perfect
+    // testing advanced configuration still needs to happen
+    private List<String> createSocksClient(Map<String, Object> inParams, String type) throws IOException {
         Object newDestObj = inParams.get("NewDest");
         Integer newDest = newDestObj != null ? ((Number) newDestObj).intValue() : null;
         boolean allowNewDestOnResume = newDest != null && newDest == 1;
@@ -233,21 +280,10 @@ public class TunnelManagerHandler implements RequestHandler {
                                       (newDest != null && newDest == 2);
 
         Properties config = new Properties();
-        config.setProperty(TunnelController.PROP_TYPE, type);
-        config.setProperty(TunnelController.PROP_NAME, name.trim());
-        config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(port));
+       setNamePortSharedStartOnLoadDescriptionInterface(config, inParams, type);
 
-        String reachableBy = (String) inParams.get("ReachableBy");
 
-        config.setProperty(TunnelController.PROP_INTFC, reachableBy != null ? reachableBy : "127.0.0.1");
-        config.setProperty(TunnelController.PROP_SHARED, Boolean.toString(shared));
-        config.setProperty(TunnelController.PROP_START, Boolean.toString(startOnLoad));
-
-        String description = (String) inParams.get("Description");
-        if (description != null)
-            config.setProperty(TunnelController.PROP_DESCR, description);
-
-        String nickname = shared ? "shared clients" : name.trim();
+        String nickname = getShared(inParams) ? "shared clients" : getName(inParams).trim();
         config.setProperty(TunnelController.PFX_OPTION + "inbound.nickname", nickname);
         config.setProperty(TunnelController.PFX_OPTION + "outbound.nickname", nickname);
         config.setProperty(TunnelController.PFX_OPTION + "i2p.streaming.connectDelay",
