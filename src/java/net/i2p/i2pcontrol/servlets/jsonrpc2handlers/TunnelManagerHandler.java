@@ -261,15 +261,6 @@ public class TunnelManagerHandler implements RequestHandler {
     }
 
 
-    // TODO: each advanced configuration has some shared
-    //  field to it meaning we can break up this function into reusable pieces
-    //  allow us to implement logic faster between other client / services types
-    //  some I have seen: tunnel length options, tunnel quantity for example.
-
-
-    // TODO: Non advanced - Name, Description, Port, auto start
-
-
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
     private String getType(Map<String, Object> inParams) {
         String type = (String) inParams.get("Type");
@@ -447,13 +438,6 @@ public class TunnelManagerHandler implements RequestHandler {
         return getPersistentClientKey(inParams);
     }
 
-//    private int getNewDestMode(Map<String, Object> inParams) {
-//        if (getPersistentClientKey(inParams))
-//            return 2;
-//        if (getAllowNewDestOnResume(inParams))
-//            return 1;
-//        return 0;
-//    }
 
     private int getNewDestMode(Map<String, Object> inParams, String type) {
         if (getPersistentClientKey(inParams, type))
@@ -517,12 +501,6 @@ public class TunnelManagerHandler implements RequestHandler {
                TunnelController.TYPE_SOCKS_IRC.equals(type);
     }
 
-//    private boolean usesSharedClientOption(String type) {
-//        return TunnelController.TYPE_STD_CLIENT.equals(type) ||
-//               TunnelController.TYPE_IRC_CLIENT.equals(type) ||
-//               isProxyClientType(type);
-//    }
-
     private boolean supportsPersistentClientKey(String type) {
         return !TunnelController.TYPE_HTTP_CLIENT.equals(type) &&
                !TunnelController.TYPE_CONNECT.equals(type) &&
@@ -540,14 +518,6 @@ public class TunnelManagerHandler implements RequestHandler {
                TunnelController.TYPE_IRC_CLIENT.equals(type) ||
                TunnelController.TYPE_STREAMR_CLIENT.equals(type);
     }
-
-//    private boolean supportsDelayOpen(String type) {
-//        return !TunnelController.TYPE_STREAMR_CLIENT.equals(type);
-//    }
-//
-//    private boolean supportsProfileOptions(String type) {
-//        return TunnelController.TYPE_STD_CLIENT.equals(type);
-//    }
 
     private boolean supportsUseSSL(String type) {
         return TunnelController.TYPE_STD_CLIENT.equals(type) ||
