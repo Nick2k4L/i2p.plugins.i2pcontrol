@@ -524,7 +524,8 @@ public class TunnelManagerHandler implements RequestHandler {
 //    }
 
     private boolean supportsPersistentClientKey(String type) {
-        return !TunnelController.TYPE_CONNECT.equals(type) &&
+        return !TunnelController.TYPE_HTTP_CLIENT.equals(type) &&
+               !TunnelController.TYPE_CONNECT.equals(type) &&
                !TunnelController.TYPE_STREAMR_CLIENT.equals(type);
     }
 
