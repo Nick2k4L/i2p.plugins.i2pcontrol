@@ -6,19 +6,30 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 import net.i2p.client.I2PClient;
+import net.i2p.crypto.EncType;
+import net.i2p.crypto.KeyGenerator;
+import net.i2p.crypto.KeyPair;
+import net.i2p.crypto.SigType;
+import net.i2p.data.Base64;
+import net.i2p.data.DataHelper;
+import net.i2p.data.Hash;
+import net.i2p.data.SimpleDataStructure;
 import net.i2p.i2ptunnel.I2PTunnelClientBase;
 import net.i2p.i2ptunnel.I2PTunnelConnectClient;
 import net.i2p.i2ptunnel.I2PTunnelHTTPClient;
 import net.i2p.i2ptunnel.I2PTunnelHTTPClientBase;
 import net.i2p.i2ptunnel.I2PTunnelIRCClient;
+import net.i2p.i2ptunnel.SSLClientUtil;
 import net.i2p.i2ptunnel.TunnelController;
 import net.i2p.i2ptunnel.TunnelControllerGroup;
 import net.i2p.i2ptunnel.socks.I2PSOCKSTunnel;
 import net.i2p.router.RouterContext;
+import net.i2p.util.ConvertToHash;
 import net.i2p.util.PasswordManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -430,9 +441,25 @@ public class TunnelManagerHandler implements RequestHandler {
                (newDest != null && newDest == 2);
     }
 
-    private int getNewDestMode(Map<String, Object> inParams) {
-        if (getPersistentClientKey(inParams))
+    private boolean getPersistentClientKey(Map<String, Object> inParams, String type) {
+        if (!supportsPersistentClientKey(type))
+            return false;
+        return getPersistentClientKey(inParams);
+    }
+
+//    private int getNewDestMode(Map<String, Object> inParams) {
+//        if (getPersistentClientKey(inParams))
+//            return 2;
+//        if (getAllowNewDestOnResume(inParams))
+//            return 1;
+//        return 0;
+//    }
+
+    private int getNewDestMode(Map<String, Object> inParams, String type) {
+        if (getPersistentClientKey(inParams, type))
             return 2;
+        if (!supportsPersistentClientKey(type))
+            return 0;
         if (getAllowNewDestOnResume(inParams))
             return 1;
         return 0;
@@ -490,10 +517,21 @@ public class TunnelManagerHandler implements RequestHandler {
                TunnelController.TYPE_SOCKS_IRC.equals(type);
     }
 
-    private boolean usesSharedClientOption(String type) {
-        return TunnelController.TYPE_STD_CLIENT.equals(type) ||
-               TunnelController.TYPE_IRC_CLIENT.equals(type) ||
-               isProxyClientType(type);
+//    private boolean usesSharedClientOption(String type) {
+//        return TunnelController.TYPE_STD_CLIENT.equals(type) ||
+//               TunnelController.TYPE_IRC_CLIENT.equals(type) ||
+//               isProxyClientType(type);
+//    }
+
+    private boolean supportsPersistentClientKey(String type) {
+        return !TunnelController.TYPE_CONNECT.equals(type) &&
+               !TunnelController.TYPE_STREAMR_CLIENT.equals(type);
+    }
+
+    private boolean getSharedClient(Map<String, Object> inParams, String type) {
+        if (TunnelController.TYPE_STREAMR_CLIENT.equals(type))
+            return false;
+        return getShared(inParams);
     }
 
     private boolean requiresTargetDestination(String type) {
@@ -502,13 +540,13 @@ public class TunnelManagerHandler implements RequestHandler {
                TunnelController.TYPE_STREAMR_CLIENT.equals(type);
     }
 
-    private boolean supportsDelayOpen(String type) {
-        return !TunnelController.TYPE_STREAMR_CLIENT.equals(type);
-    }
-
-    private boolean supportsProfileOptions(String type) {
-        return TunnelController.TYPE_STD_CLIENT.equals(type);
-    }
+//    private boolean supportsDelayOpen(String type) {
+//        return !TunnelController.TYPE_STREAMR_CLIENT.equals(type);
+//    }
+//
+//    private boolean supportsProfileOptions(String type) {
+//        return TunnelController.TYPE_STD_CLIENT.equals(type);
+//    }
 
     private boolean supportsUseSSL(String type) {
         return TunnelController.TYPE_STD_CLIENT.equals(type) ||
@@ -536,6 +574,16 @@ public class TunnelManagerHandler implements RequestHandler {
         return TunnelController.TYPE_HTTP_CLIENT.equals(type);
     }
 
+    private boolean getConfiguredUseSSL(Map<String, Object> inParams, String type) {
+        return supportsUseSSL(type) && getUseSSL(inParams);
+    }
+
+    private boolean getConfiguredDelayOpen(Map<String, Object> inParams, String type) {
+        if (TunnelController.TYPE_STREAMR_CLIENT.equals(type))
+            return false;
+        return getDelayOpen(inParams);
+    }
+
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
 
 
@@ -556,6 +604,7 @@ public class TunnelManagerHandler implements RequestHandler {
     // tunnel endpoints
     private void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
         String name = getName(inParams).trim();
+        boolean sharedClient = getSharedClient(inParams, type);
         if (TunnelController.TYPE_STREAMR_CLIENT.equals(type)) {
             String targetHost = getTargetHost(inParams);
             config.setProperty(TunnelController.PROP_TARGET_HOST, targetHost != null ? targetHost : "127.0.0.1");
@@ -564,15 +613,14 @@ public class TunnelManagerHandler implements RequestHandler {
             config.setProperty(TunnelController.PROP_INTFC, reachableBy != null ? reachableBy : "127.0.0.1");
         }
 
-        if (usesSharedClientOption(type))
-            config.setProperty(TunnelController.PROP_SHARED, Boolean.toString(getShared(inParams)));
+        config.setProperty(TunnelController.PROP_SHARED, Boolean.toString(sharedClient));
 
-        String nickname = usesSharedClientOption(type) && getShared(inParams) ? SHARED_CLIENT_NICKNAME : name;
+        String nickname = sharedClient ? SHARED_CLIENT_NICKNAME : name;
         config.setProperty(OPT + "inbound.nickname", nickname);
         config.setProperty(OPT + "outbound.nickname", nickname);
 
-        if (supportsUseSSL(type))
-            config.setProperty(OPT + I2PTunnelClientBase.PROP_USE_SSL, Boolean.toString(getUseSSL(inParams)));
+        config.setProperty(OPT + I2PTunnelClientBase.PROP_USE_SSL,
+                           Boolean.toString(getConfiguredUseSSL(inParams, type)));
 
         if (supportsDCC(type)) {
             boolean dcc = getDCC(inParams);
@@ -624,27 +672,25 @@ public class TunnelManagerHandler implements RequestHandler {
 
     // Tunnel Management Options
     private void setTunnelManagementOptions(Properties config, Map<String, Object> inParams, String type) {
-        boolean persistentClientKey = getPersistentClientKey(inParams);
+        boolean persistentClientKey = getPersistentClientKey(inParams, type);
         Integer reduceCount = getReduceCount(inParams);
         Integer reduceTime = getReduceTime(inParams);
         Integer closeTime = getCloseTime(inParams);
- 
-        if (supportsProfileOptions(type)) {
-            config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY, getConnectDelay(inParams) ? "500" : "0");
-            String profile = getProfile(inParams);
-            if ("interactive".equals(profile))
-                config.setProperty(OPT + PROP_STREAMING_MAX_WINDOW_SIZE, "16");
-            else
-                config.remove(OPT + PROP_STREAMING_MAX_WINDOW_SIZE);
-        }
 
-        if (supportsDelayOpen(type))
-            config.setProperty(OPT + PROP_DELAY_OPEN, Boolean.toString(getDelayOpen(inParams)));
+        config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY, getConnectDelay(inParams) ? "500" : "0");
+
+        String profile = getProfile(inParams);
+        if ("interactive".equals(profile))
+            config.setProperty(OPT + PROP_STREAMING_MAX_WINDOW_SIZE, "16");
+        else
+            config.remove(OPT + PROP_STREAMING_MAX_WINDOW_SIZE);
+
+        config.setProperty(OPT + PROP_DELAY_OPEN, Boolean.toString(getConfiguredDelayOpen(inParams, type)));
 
         config.setProperty(OPT + PROP_REDUCE_ON_IDLE, Boolean.toString(getReduce(inParams)));
         config.setProperty(OPT + PROP_CLOSE_ON_IDLE, Boolean.toString(getClose(inParams)));
 
-        int newDestMode = getNewDestMode(inParams);
+        int newDestMode = getNewDestMode(inParams, type);
         config.setProperty(OPT + PROP_NEW_DEST_ON_RESUME, Boolean.toString(newDestMode == 1));
         config.setProperty(OPT + PROP_PERSISTENT_CLIENT_KEY, Boolean.toString(newDestMode == 2));
 
@@ -658,10 +704,12 @@ public class TunnelManagerHandler implements RequestHandler {
             config.setProperty(OPT + PROP_CLOSE_IDLE_TIME, Integer.toString(closeTime * 60 * 1000));
 
         String privKeyFile = getPrivKeyFile(inParams);
-        if (privKeyFile != null) {
+        if (privKeyFile != null && persistentClientKey) {
             config.setProperty(TunnelController.PROP_FILE, privKeyFile);
         } else if (persistentClientKey) {
             config.setProperty(TunnelController.PROP_FILE, getDefaultPrivateKeyFile());
+        } else {
+            config.remove(TunnelController.PROP_FILE);
         }
     }
 
@@ -670,12 +718,23 @@ public class TunnelManagerHandler implements RequestHandler {
         if (!isProxyClientType(type))
             return;
 
+        boolean isHTTPClient = TunnelController.TYPE_HTTP_CLIENT.equals(type);
         String proxyList = getProxyList(inParams);
         if (proxyList != null)
             config.setProperty(TunnelController.PROP_PROXIES, proxyList);
 
         config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_USE_OUTPROXY_PLUGIN,
                            Boolean.toString(getUseOutproxyPlugin(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPClient.PROP_USER_AGENT,
+                           Boolean.toString(isHTTPClient && getAllowUserAgent(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPClient.PROP_REFERER,
+                           Boolean.toString(isHTTPClient && getAllowReferer(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPClient.PROP_ACCEPT,
+                           Boolean.toString(isHTTPClient && getAllowAccept(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPClient.PROP_INTERNAL_SSL,
+                           Boolean.toString(isHTTPClient && getAllowInternalSSL(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPClient.PROP_SSL_SET,
+                           Boolean.toString(isHTTPClient));
 
         if (supportsOutproxyType(type)) {
             String outproxyType = getOutproxyType(inParams);
@@ -684,7 +743,6 @@ public class TunnelManagerHandler implements RequestHandler {
         }
 
         if (supportsSSLProxies(type)) {
-            config.setProperty(OPT + I2PTunnelHTTPClient.PROP_SSL_SET, "true");
             String sslProxies = getSSLProxies(inParams);
             if (sslProxies != null)
                 config.setProperty(OPT + I2PTunnelHTTPClient.PROP_SSL_OUTPROXIES,
@@ -764,9 +822,7 @@ public class TunnelManagerHandler implements RequestHandler {
 
     // Tunnel Cryptography Options
     private void setTunnelCryptographyOptions(Properties config, Map<String, Object> inParams) {
-        String sigType = getSigType(inParams);
-        if (sigType != null)
-            config.setProperty(OPT + I2PClient.PROP_SIGTYPE, sigType);
+        config.setProperty(OPT + I2PClient.PROP_SIGTYPE, getNormalizedSigType(inParams));
 
         String encType = getEncType(inParams);
         if (encType != null)
@@ -781,7 +837,7 @@ public class TunnelManagerHandler implements RequestHandler {
     }
 
     private List<String> createClient(Map<String, Object> inParams, String type) throws IOException {
-        boolean persistentClientKey = getPersistentClientKey(inParams);
+        boolean persistentClientKey = getPersistentClientKey(inParams, type);
         Properties config = new Properties();
         setCommon(config, inParams, type);
         setTunnelClientEndpointOptions(config, inParams, type);
@@ -795,6 +851,7 @@ public class TunnelManagerHandler implements RequestHandler {
         setTunnelLengthOptions(config, inParams);
         setTunnelQuantityOptions(config, inParams);
         setTunnelCryptographyOptions(config, inParams);
+        finalizeClientConfig(config, type);
 
         TunnelController controller = new TunnelController(config, "", persistentClientKey);
         _group.addController(controller);
@@ -827,6 +884,7 @@ public class TunnelManagerHandler implements RequestHandler {
         Map<String, String> rawConfig = new TreeMap<>();
         Map<String, String> optionConfig = new TreeMap<>();
         Map<String, String> baseConfig = new TreeMap<>();
+        Map<String, Object> controllerConfig = new LinkedHashMap<>();
 
         for (Map.Entry<Object, Object> entry : config.entrySet()) {
             String key = (String) entry.getKey();
@@ -844,6 +902,37 @@ public class TunnelManagerHandler implements RequestHandler {
         tunnelInfo.put("client", tc.isClient());
         tunnelInfo.put("description", tc.getDescription());
         tunnelInfo.put("status", getTunnelStatusForOptions(tc));
+        tunnelInfo.put("starting", tc.getIsStarting());
+        tunnelInfo.put("standby", tc.getIsStandby());
+        tunnelInfo.put("startOnLoad", tc.getStartOnLoad());
+        tunnelInfo.put("sharedClient", tc.getSharedClient());
+        tunnelInfo.put("persistentClientKey", tc.getPersistentClientKey());
+        tunnelInfo.put("offlineKeys", tc.getIsOfflineKeys());
+        tunnelInfo.put("listenOnInterface", tc.getListenOnInterface());
+        tunnelInfo.put("listenPort", tc.getListenPort());
+        tunnelInfo.put("targetHost", tc.getTargetHost());
+        tunnelInfo.put("targetPort", tc.getTargetPort());
+        tunnelInfo.put("targetDestination", tc.getTargetDestination());
+        tunnelInfo.put("proxyList", tc.getProxyList());
+        tunnelInfo.put("privateKeyFile", tc.getPrivKeyFile());
+        tunnelInfo.put("destination", tc.getMyDestination());
+        tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
+        tunnelInfo.put("clientOptionsString", tc.getClientOptions());
+        controllerConfig.put("i2cpHost", tc.getI2CPHost());
+        controllerConfig.put("i2cpPort", tc.getI2CPPort());
+        controllerConfig.put("listenOnInterface", tc.getListenOnInterface());
+        controllerConfig.put("listenPort", tc.getListenPort());
+        controllerConfig.put("targetHost", tc.getTargetHost());
+        controllerConfig.put("targetPort", tc.getTargetPort());
+        controllerConfig.put("targetDestination", tc.getTargetDestination());
+        controllerConfig.put("proxyList", tc.getProxyList());
+        controllerConfig.put("sharedClient", tc.getSharedClient());
+        controllerConfig.put("startOnLoad", tc.getStartOnLoad());
+        controllerConfig.put("persistentClientKey", tc.getPersistentClientKey());
+        controllerConfig.put("privateKeyFile", tc.getPrivKeyFile());
+        controllerConfig.put("filter", tc.getFilter());
+        controllerConfig.put("spoofedHost", tc.getSpoofedHost());
+        tunnelInfo.put("controller", controllerConfig);
         tunnelInfo.put("rawConfig", rawConfig);
         tunnelInfo.put("config", baseConfig);
         tunnelInfo.put("options", optionConfig);
@@ -861,6 +950,121 @@ public class TunnelManagerHandler implements RequestHandler {
     private void setTunnelQuantity(Properties config, String name, int inbound, int outbound) {
         config.setProperty(OPT + "inbound." + name, Integer.toString(inbound));
         config.setProperty(OPT + "outbound." + name, Integer.toString(outbound));
+    }
+
+    private String getNormalizedSigType(Map<String, Object> inParams) {
+        String sigType = getSigType(inParams);
+        SigType parsed = sigType != null ? SigType.parseSigType(sigType.trim()) : null;
+        if (parsed == null || !parsed.isAvailable())
+            parsed = TunnelController.PREFERRED_SIGTYPE;
+        return Integer.toString(parsed.getCode());
+    }
+
+    private void finalizeClientConfig(Properties config, String type) throws IOException {
+        if (Boolean.parseBoolean(config.getProperty(OPT + PROP_PERSISTENT_CLIENT_KEY)))
+            ensurePersistentClientOptions(config);
+        if ((TunnelController.TYPE_STD_CLIENT.equals(type) || TunnelController.TYPE_IRC_CLIENT.equals(type)) &&
+            Boolean.parseBoolean(config.getProperty(OPT + I2PTunnelClientBase.PROP_USE_SSL))) {
+            ensureClientSSLKeyStore(config);
+        }
+    }
+
+    private void ensureClientSSLKeyStore(Properties config) {
+        try {
+            SSLClientUtil.verifyKeyStore(config, OPT, buildClientCertificateAltNames(config));
+        } catch (IOException ioe) {
+            try {
+                SSLClientUtil.verifyKeyStore(config, OPT);
+            } catch (IOException ignored) {
+                // Mirror the app/UI behavior: a keystore generation failure should not block
+                // saving the tunnel config, because the alias/file props may still be useful
+                // for comparison and the user can inspect the failure separately in logs.
+            }
+        } catch (IllegalArgumentException iae) {
+            try {
+                SSLClientUtil.verifyKeyStore(config, OPT);
+            } catch (IOException ignored) {
+                // See note above.
+            }
+        }
+    }
+
+    private Set<String> buildClientCertificateAltNames(Properties config) {
+        Set<String> altNames = new HashSet<>(4);
+        String intfc = config.getProperty(TunnelController.PROP_INTFC);
+        if (intfc != null && !intfc.equals("0.0.0.0") && !intfc.equals("::") &&
+            !intfc.equals("0:0:0:0:0:0:0:0"))
+            altNames.add(intfc);
+        String tgts = config.getProperty(TunnelController.PROP_DEST);
+        if (tgts != null) {
+            if (intfc != null)
+                altNames.add(intfc);
+            String[] hosts = DataHelper.split(tgts, "[ ,]");
+            for (String h : hosts) {
+                int colon = h.indexOf(':');
+                if (colon >= 0)
+                    h = h.substring(0, colon);
+                altNames.add(h);
+                if (!h.endsWith(".b32.i2p")) {
+                    Hash hash = ConvertToHash.getHash(h);
+                    if (hash != null)
+                        altNames.add(hash.toBase32());
+                }
+            }
+        }
+        return altNames;
+    }
+
+    private void ensurePersistentClientOptions(Properties config) {
+        String p = OPT + "inbound.randomKey";
+        if (!config.containsKey(p)) {
+            byte[] rk = new byte[32];
+            _context.random().nextBytes(rk);
+            config.setProperty(p, Base64.encode(rk));
+            p = OPT + "outbound.randomKey";
+            _context.random().nextBytes(rk);
+            config.setProperty(p, Base64.encode(rk));
+        }
+
+        String leaseSetType = config.getProperty(OPT + "i2cp.leaseSetType", "0");
+        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType", "4,0");
+        if ("0".equals(encTypes) && "0".equals(leaseSetType)) {
+            p = OPT + "i2cp.leaseSetSigningPrivateKey";
+            if (!config.containsKey(p)) {
+                SigType type = SigType.parseSigType(config.getProperty(OPT + I2PClient.PROP_SIGTYPE,
+                                                                       Integer.toString(TunnelController.PREFERRED_SIGTYPE.getCode())));
+                if (type != null) {
+                    try {
+                        SimpleDataStructure[] keys = KeyGenerator.getInstance().generateSigningKeys(type);
+                        config.setProperty(p, type.name() + ':' + keys[1].toBase64());
+                    } catch (GeneralSecurityException gse) {
+                        // Leave unset if we can't generate it.
+                    }
+                }
+            }
+        }
+
+        p = OPT + "i2cp.leaseSetPrivateKey";
+        String existingKeys = config.getProperty(p);
+        if (existingKeys != null && !existingKeys.isEmpty() && !existingKeys.contains(":")) {
+            existingKeys = "ELGAMAL_2048:" + existingKeys;
+            config.setProperty(p, existingKeys);
+        }
+        for (String encType : DataHelper.split(encTypes, ",")) {
+            EncType type = EncType.parseEncType(encType);
+            if (type == null || !type.isAvailable())
+                continue;
+            String typeName = type.toString();
+            existingKeys = config.getProperty(p, "");
+            if (!existingKeys.contains(typeName + ':')) {
+                KeyPair keys = KeyGenerator.getInstance().generatePKIKeys(type);
+                String newKey = typeName + ':' + keys.getPrivate().toBase64();
+                if (!existingKeys.isEmpty())
+                    config.setProperty(p, existingKeys + ',' + newKey);
+                else
+                    config.setProperty(p, newKey);
+            }
+        }
     }
 
     private void addCustomOptions(Properties config, String customOptions) {
