@@ -961,7 +961,7 @@ public class TunnelManagerHandler implements RequestHandler {
         return Integer.toString(parsed.getCode());
     }
 
-    private void finalizeClientConfig(Properties config, String type) throws IOException {
+    private void finalizeClientConfig(Properties config, String type) {
         if (Boolean.parseBoolean(config.getProperty(OPT + PROP_PERSISTENT_CLIENT_KEY)))
             ensurePersistentClientOptions(config);
         if ((TunnelController.TYPE_STD_CLIENT.equals(type) || TunnelController.TYPE_IRC_CLIENT.equals(type)) &&
