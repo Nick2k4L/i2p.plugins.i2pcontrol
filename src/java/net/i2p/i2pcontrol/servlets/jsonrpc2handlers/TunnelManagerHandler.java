@@ -157,9 +157,9 @@ public class TunnelManagerHandler implements RequestHandler {
                         case TunnelController.TYPE_SOCKS:
                         case TunnelController.TYPE_CONNECT:
                         case TunnelController.TYPE_STREAMR_CLIENT:
-                            List<String> results = createClient(inParams, type);
+                            List<String> clientResults = createClient(inParams, type);
                             outParams.put("status", "success - created tunnel " + name.trim());
-                            outParams.put("results", results);
+                            outParams.put("results", clientResults);
                             return new JSONRPC2Response(outParams, req.getID());
 
                         case TunnelController.TYPE_HTTP_SERVER:
@@ -167,7 +167,9 @@ public class TunnelManagerHandler implements RequestHandler {
                         case TunnelController.TYPE_HTTP_BIDIR_SERVER:
                         case TunnelController.TYPE_IRC_SERVER:
                         case TunnelController.TYPE_STREAMR_SERVER:
-                            outParams.put("status", "error - not implemented yet");
+                            List<String> serviceResults = createService(inParams, type);
+                            outParams.put("status", "success - created tunnel " + name.trim());
+                            outParams.put("results", serviceResults);
                             return new JSONRPC2Response(outParams, req.getID());
 
 
@@ -259,6 +261,18 @@ public class TunnelManagerHandler implements RequestHandler {
                 return null;
         }
     }
+
+
+    // TODO: Next is now hidden services. We are going to use the same:
+    //  type, name, description, autoStart, port, host, tunnel length, tunnel quantity
+    //  tunnel performance options (maybe), sigType, encType, custom options???
+    //  what will be different:
+    //  - Website hostname (sort of like host from above)
+    //  - Use SLL to connect to target (might be able to reuse)
+    //  - 
+    //  - Tunnel Access Control Options
+    //  - Server Throttling
+    //  - Encrypt Leaseset
 
 
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
@@ -559,6 +573,9 @@ public class TunnelManagerHandler implements RequestHandler {
 
 
     // --- Set properties, allows us to set based on the API body --- \\\
+
+
+    // TODO: Remember that http is target-port , some may vary slightly
     private void setCommon(Properties config, Map<String, Object> inParams, String type) {
         String name = getName(inParams);
 
@@ -566,6 +583,10 @@ public class TunnelManagerHandler implements RequestHandler {
         config.setProperty(TunnelController.PROP_NAME, name.trim());
         config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(getPort(inParams)));
         config.setProperty(TunnelController.PROP_START, Boolean.toString(getStartOnLoad(inParams)));
+
+        if (TunnelController.TYPE_HTTP_SERVER.equals(type)) {
+            config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(getPort(inParams)));
+        }
 
         String description = getDescription(inParams);
         if (description != null)
@@ -576,7 +597,7 @@ public class TunnelManagerHandler implements RequestHandler {
     private void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
         String name = getName(inParams).trim();
         boolean sharedClient = getSharedClient(inParams, type);
-        if (TunnelController.TYPE_STREAMR_CLIENT.equals(type)) {
+        if (TunnelController.TYPE_STREAMR_CLIENT.equals(type) || TunnelController.TYPE_HTTP_SERVER.equals(type)) {
             String targetHost = getTargetHost(inParams);
             config.setProperty(TunnelController.PROP_TARGET_HOST, targetHost != null ? targetHost : "127.0.0.1");
         } else {
@@ -806,6 +827,22 @@ public class TunnelManagerHandler implements RequestHandler {
         if (customOptions != null)
             addCustomOptions(config, customOptions);
     }
+
+
+    private List<String> createService(Map<String, Object> inParams, String type) throws IOException {
+        Properties config = new Properties();
+        setCommon(config, inParams, type);
+        setTunnelClientEndpointOptions(config, inParams, type);
+
+        TunnelController controller = new TunnelController(config, "");
+        _group.addController(controller);
+        _group.saveConfig(controller);
+        if (controller.getStartOnLoad())
+            controller.startTunnelBackground();
+        return controller.clearMessages();
+    }
+
+
 
     private List<String> createClient(Map<String, Object> inParams, String type) throws IOException {
         boolean persistentClientKey = getPersistentClientKey(inParams, type);
