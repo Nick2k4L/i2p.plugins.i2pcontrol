@@ -14,14 +14,7 @@ import net.i2p.data.Base64;
 import net.i2p.data.DataHelper;
 import net.i2p.data.Hash;
 import net.i2p.data.SimpleDataStructure;
-import net.i2p.i2ptunnel.I2PTunnelClientBase;
-import net.i2p.i2ptunnel.I2PTunnelConnectClient;
-import net.i2p.i2ptunnel.I2PTunnelHTTPClient;
-import net.i2p.i2ptunnel.I2PTunnelHTTPClientBase;
-import net.i2p.i2ptunnel.I2PTunnelIRCClient;
-import net.i2p.i2ptunnel.SSLClientUtil;
-import net.i2p.i2ptunnel.TunnelController;
-import net.i2p.i2ptunnel.TunnelControllerGroup;
+import net.i2p.i2ptunnel.*;
 import net.i2p.i2ptunnel.socks.I2PSOCKSTunnel;
 import net.i2p.router.RouterContext;
 import net.i2p.util.ConvertToHash;
@@ -568,11 +561,39 @@ public class TunnelManagerHandler implements RequestHandler {
             return false;
         return getDelayOpen(inParams);
     }
+    // LOCAL DESTINATION
+
+    // ENCRYPT LEASE SET / OPTIONAL LOOKUP
+
+
+    // CLIENT CONNECTIONS
+
+
+
+    // POST LIMITS
+    private Integer getPostLimitPeriod(Map<String, Object> inParams) {
+        Object postPeriodObj = inParams.get("PostLimit");
+        return postPeriodObj != null ? ((Number) postPeriodObj).intValue() : null;
+    }
+
+    private Integer getPostBanTime(Map<String, Object> inParams) {
+        Object postBanTimeObj = inParams.get("PostLimitTime");
+        return postBanTimeObj != null ? ((Number) postBanTimeObj).intValue() : null;
+    }
+
 
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
 
 
     // --- Set properties, allows us to set based on the API body --- \\\
+
+    private void setPosts(Properties config, Map<String, Object> inParams, String type) {
+        Integer postLimitPeriod = getPostLimitPeriod(inParams);
+        Integer postBanTime = getPostBanTime(inParams);
+
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, postLimitPeriod != null ? Integer.toString(postLimitPeriod) : null);
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, postBanTime != null ? Integer.toString(postBanTime) : null);
+    }
 
 
     // TODO: Remember that http is target-port , some may vary slightly
@@ -833,6 +854,7 @@ public class TunnelManagerHandler implements RequestHandler {
         Properties config = new Properties();
         setCommon(config, inParams, type);
         setTunnelClientEndpointOptions(config, inParams, type);
+        setPosts(config, inParams, type);
 
         TunnelController controller = new TunnelController(config, "");
         _group.addController(controller);
