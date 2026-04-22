@@ -62,6 +62,16 @@ public class TunnelManagerHandler implements RequestHandler {
 
     private static final String PROP_ENABLE_ACCESS_LIST = "i2cp.enableAccessList";
     private static final String PROP_ENABLE_BLACKLIST = "i2cp.enableBlackList";
+    private static final int ENCRYPT_LEASE_SET_DISABLE = 0;
+    private static final int ENCRYPT_LEASE_SET_AES = 1;
+    private static final int ENCRYPT_LEASE_SET_BLINDED = 2;
+    private static final int ENCRYPT_LEASE_SET_BLINDED_LOOKUP = 3;
+    private static final int ENCRYPT_LEASE_SET_PSK = 4;
+    private static final int ENCRYPT_LEASE_SET_PSK_LOOKUP = 5;
+    private static final int ENCRYPT_LEASE_SET_PSK_PER_USER = 6;
+    private static final int ENCRYPT_LEASE_SET_PSK_LOOKUP_PER_USER = 7;
+    private static final int ENCRYPT_LEASE_SET_DH_PER_USER = 8;
+    private static final int ENCRYPT_LEASE_SET_DH_LOOKUP_PER_USER = 9;
 
     private static final String[] NO_SHOW_OPTS = {
         "inbound.length", "outbound.length", "inbound.lengthVariance", "outbound.lengthVariance",
@@ -289,6 +299,8 @@ public class TunnelManagerHandler implements RequestHandler {
     private List<String> createService(Map<String, Object> inParams, String type) throws IOException {
         Properties config = new Properties();
         setCommon(config, inParams, type);
+        setTunnelCryptographyOptions(config, inParams);
+        setEncryptLeaseSetOptions(config, inParams);
         setTunnelClientEndpointOptions(config, inParams, type);
         setPosts(config, inParams, type);
         setConcurrentConnections(config, inParams, type);
@@ -298,7 +310,6 @@ public class TunnelManagerHandler implements RequestHandler {
         setReduce(config, inParams, type);
         setServerAccessOptions(config, inParams, type);
         setRestrictedAccessList(config, inParams, type);
-
 
         TunnelController controller = new TunnelController(config, "");
         _group.addController(controller);
@@ -609,6 +620,51 @@ public class TunnelManagerHandler implements RequestHandler {
         return (String) inParams.get("EncryptLeaseSet");
     }
 
+    private int getEncryptLeaseSetMode(Map<String, Object> inParams) {
+        String encryptLeaseSet = getEncryptLeaseSet(inParams);
+        if (encryptLeaseSet == null)
+            return -1;
+
+        encryptLeaseSet = encryptLeaseSet.trim();
+        if (encryptLeaseSet.isEmpty())
+            return -1;
+
+        String mode = encryptLeaseSet.toLowerCase();
+        switch (mode) {
+            case "disable":
+                return ENCRYPT_LEASE_SET_DISABLE;
+
+            case "encrypted (aes)":
+                return ENCRYPT_LEASE_SET_AES;
+
+            case "blinded":
+                return ENCRYPT_LEASE_SET_BLINDED;
+
+            case "blinded with lookup password":
+                return ENCRYPT_LEASE_SET_BLINDED_LOOKUP;
+
+            case "encrypted (psk)":
+                return ENCRYPT_LEASE_SET_PSK;
+
+            case "encrypted with lookup password (psk)":
+                return ENCRYPT_LEASE_SET_PSK_LOOKUP;
+
+            case "encrypted with per-user key (psk)":
+                return ENCRYPT_LEASE_SET_PSK_PER_USER;
+
+            case "encrypted with lookup password and per-user key (psk)":
+                return ENCRYPT_LEASE_SET_PSK_LOOKUP_PER_USER;
+
+            case "encrypted with per-user key (dh)":
+                return ENCRYPT_LEASE_SET_DH_PER_USER;
+
+            case "encrypted with lookup password and per-user key (dh)":
+                return ENCRYPT_LEASE_SET_DH_LOOKUP_PER_USER;
+
+            default:
+                throw new IllegalArgumentException("EncryptLeaseSet is not valid");
+        }
+    }
 
     // Optional lookup | Only certain LeaseSets support this, if one doesn't remove any pre-existing passwords.
     private String getOptionalLookup(Map<String, Object> inParams) {
@@ -622,6 +678,10 @@ public class TunnelManagerHandler implements RequestHandler {
 
     private boolean getBlockUserAgents(Map<String, Object> inParams) {
         return Boolean.TRUE.equals(inParams.get("BlockUserAgents"));
+    }
+
+    private String getUserAgents(Map<String, Object> inParams) {
+        return (String) inParams.get("UserAgents");
     }
 
     private boolean getUniqueLocalAddressPerClient(Map<String, Object> inParams) {
@@ -733,14 +793,18 @@ public class TunnelManagerHandler implements RequestHandler {
 
     private void setRestrictedAccessList(Properties config, Map<String, Object> inParams, String type){
         String accessMode = getAccessOption(inParams);
+        config.remove(OPT + PROP_ENABLE_ACCESS_LIST);
+        config.remove(OPT + PROP_ENABLE_BLACKLIST);
 
-        switch (accessMode){
-            case "allow":
-                config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, String.valueOf(true));
-                break;
-            case "deny":
-                config.setProperty(OPT + PROP_ENABLE_BLACKLIST, String.valueOf(true));
-                break;
+        if (accessMode != null) {
+            switch (accessMode){
+                case "allow":
+                    config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, String.valueOf(true));
+                    break;
+                case "deny":
+                    config.setProperty(OPT + PROP_ENABLE_BLACKLIST, String.valueOf(true));
+                    break;
+            }
         }
 
         setAccessList(getAccessList(inParams), config);
@@ -754,6 +818,7 @@ public class TunnelManagerHandler implements RequestHandler {
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_INPROXY, Boolean.toString(getBlockAccessInProxies(inParams)));
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_USER_AGENTS ,Boolean.toString(getBlockUserAgents(inParams)));
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_REFERER, Boolean.toString(getBlockReferers(inParams)));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS, getUserAgents(inParams));
         }
 
         config.setProperty(OPT + "shouldBundleReplyInfo", Boolean.toString(multiHoming));
@@ -1076,6 +1141,92 @@ public class TunnelManagerHandler implements RequestHandler {
             config.setProperty(OPT + "i2cp.leaseSetEncType", encType);
     }
 
+    private void setEncryptLeaseSetOptions(Properties config, Map<String, Object> inParams) {
+        int encryptMode = getEncryptLeaseSetMode(inParams);
+        if (encryptMode < 0)
+            return;
+
+        if (encryptMode >= ENCRYPT_LEASE_SET_BLINDED)
+            validateBlindedSigType(config);
+
+        config.setProperty(OPT + "i2cp.encryptLeaseSet",
+                           Boolean.toString(encryptMode == ENCRYPT_LEASE_SET_AES));
+
+        String optionalLookup = getOptionalLookup(inParams);
+        if (optionalLookup != null) {
+            optionalLookup = optionalLookup.trim();
+            if (!optionalLookup.isEmpty())
+                config.setProperty(OPT + "i2cp.leaseSetSecret", Base64.encode(DataHelper.getUTF8(optionalLookup)));
+            else
+                config.remove(OPT + "i2cp.leaseSetSecret");
+        }
+
+        switch (encryptMode) {
+            case ENCRYPT_LEASE_SET_DISABLE:
+            default:
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.remove(OPT + "i2cp.leaseSetType");
+                config.remove(OPT + "i2cp.leaseSetAuthType");
+                config.remove(OPT + "i2cp.leaseSetKey");
+                config.remove(OPT + "i2cp.leaseSetPrivKey");
+                break;
+
+            case ENCRYPT_LEASE_SET_AES:
+                addLeaseSetPrivKey(config, false);
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.remove(OPT + "i2cp.leaseSetAuthType");
+                break;
+
+            case ENCRYPT_LEASE_SET_BLINDED:
+                config.put(OPT + "i2cp.leaseSetType", "5");
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.remove(OPT + "i2cp.leaseSetAuthType");
+                config.remove(OPT + "i2cp.leaseSetKey");
+                config.remove(OPT + "i2cp.leaseSetPrivKey");
+                break;
+
+            case ENCRYPT_LEASE_SET_BLINDED_LOOKUP:
+                config.put(OPT + "i2cp.leaseSetType", "5");
+                config.remove(OPT + "i2cp.leaseSetAuthType");
+                config.remove(OPT + "i2cp.leaseSetKey");
+                config.remove(OPT + "i2cp.leaseSetPrivKey");
+                break;
+
+            case ENCRYPT_LEASE_SET_PSK:
+                addLeaseSetPrivKey(config, true);
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.put(OPT + "i2cp.leaseSetAuthType", "2");
+                break;
+
+            case ENCRYPT_LEASE_SET_PSK_LOOKUP:
+                addLeaseSetPrivKey(config, true);
+                config.put(OPT + "i2cp.leaseSetAuthType", "2");
+                break;
+
+            case ENCRYPT_LEASE_SET_PSK_PER_USER:
+                addLeaseSetPrivKey(config, true);
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.put(OPT + "i2cp.leaseSetAuthType", "2");
+                break;
+
+            case ENCRYPT_LEASE_SET_PSK_LOOKUP_PER_USER:
+                addLeaseSetPrivKey(config, true);
+                config.put(OPT + "i2cp.leaseSetAuthType", "2");
+                break;
+
+            case ENCRYPT_LEASE_SET_DH_PER_USER:
+                addLeaseSetPrivKey(config, true);
+                config.remove(OPT + "i2cp.leaseSetSecret");
+                config.put(OPT + "i2cp.leaseSetAuthType", "1");
+                break;
+
+            case ENCRYPT_LEASE_SET_DH_LOOKUP_PER_USER:
+                addLeaseSetPrivKey(config, true);
+                config.put(OPT + "i2cp.leaseSetAuthType", "1");
+                break;
+        }
+    }
+
     // Custom Options
     private void setCustomOptions(Properties config, Map<String, Object> inParams) {
         String customOptions = getCustomOptions(inParams);
@@ -1269,6 +1420,34 @@ public class TunnelManagerHandler implements RequestHandler {
         return altNames;
     }
 
+    private void validateBlindedSigType(Properties config) {
+        SigType sigType = SigType.parseSigType(config.getProperty(OPT + I2PClient.PROP_SIGTYPE,
+                                                                  Integer.toString(TunnelController.PREFERRED_SIGTYPE.getCode())));
+        if (sigType != SigType.EdDSA_SHA512_Ed25519 &&
+            sigType != SigType.RedDSA_SHA512_Ed25519) {
+            throw new IllegalArgumentException("EncryptLeaseSet requires Ed25519 or RedDSA when blinded");
+        }
+    }
+
+    private void addLeaseSetPrivKey(Properties config, boolean isBlinded) {
+        String opt = OPT + "i2cp.leaseSetKey";
+        String blindedOpt = OPT + "i2cp.leaseSetPrivKey";
+        String encoded = config.getProperty(opt);
+        if (encoded == null) {
+            byte[] data = new byte[32];
+            _context.random().nextBytes(data);
+            encoded = Base64.encode(data);
+            config.setProperty(opt, encoded);
+        }
+        if (isBlinded) {
+            config.setProperty(blindedOpt, encoded);
+            config.put(OPT + "i2cp.leaseSetType", "5");
+        } else {
+            config.remove(blindedOpt);
+            config.remove(OPT + "i2cp.leaseSetType");
+        }
+    }
+
     private void ensurePersistentClientOptions(Properties config) {
         String p = OPT + "inbound.randomKey";
         if (!config.containsKey(p)) {
@@ -1340,28 +1519,36 @@ public class TunnelManagerHandler implements RequestHandler {
         }
     }
 
+
     private void setAccessList(String val, Properties config) {
         if (val != null) {
-            val = val.trim().replace("\r\n", ",").replace("\n", ",").replace(" ", ",");
-            // Convert to B64 to save space
-            String[] vals = DataHelper.split(val, ",");
-            StringBuilder buf = new StringBuilder(val.length());
-            for (int i = 0; i < vals.length; i++) {
-                String v = vals[i];
-                int len = v.length();
-                if (len == 0)
-                    continue;
-                if (len == 60 && v.endsWith(".b32.i2p")) {
-                    byte[] b = Base32.decode(v.substring(0, 52));
-                    if (b != null)
-                        v = Base64.encode(b);
+            val = val.trim();
+            if (!val.isEmpty()) {
+                val = val.replace("\r\n", ",").replace("\n", ",").replace(" ", ",");
+                // Convert to B64 to save space
+                String[] vals = DataHelper.split(val, ",");
+                StringBuilder buf = new StringBuilder(val.length());
+                for (int i = 0; i < vals.length; i++) {
+                    String v = vals[i];
+                    int len = v.length();
+                    if (len == 0)
+                        continue;
+                    if (len == 60 && v.endsWith(".b32.i2p")) {
+                        byte[] b = Base32.decode(v.substring(0, 52));
+                        if (b != null)
+                            v = Base64.encode(b);
+                    }
+                    buf.append(v);
+                    if (i != vals.length - 1)
+                        buf.append(',');
                 }
-                buf.append(v);
-                if (i != vals.length - 1)
-                    buf.append(',');
+                if (buf.length() > 0) {
+                    config.setProperty(OPT + "i2cp.accessList", buf.toString());
+                    return;
+                }
             }
-            config.setProperty(OPT + "i2cp.accessList", buf.toString());
         }
+        config.remove(OPT + "i2cp.accessList");
     }
 
     // --- Set properties, allows us to set based on the API body --- \\\
