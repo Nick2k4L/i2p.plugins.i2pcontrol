@@ -293,6 +293,9 @@ public class TunnelManagerHandler implements RequestHandler {
         setPosts(config, inParams, type);
         setConcurrentConnections(config, inParams, type);
         setInboundConnections(config, inParams, type);
+        setProfile(config, inParams, type);
+        setReduceTunnelQuantityIdle(config, inParams, type);
+        setReduce(config, inParams, type);
 
 
         TunnelController controller = new TunnelController(config, "");
@@ -599,7 +602,16 @@ public class TunnelManagerHandler implements RequestHandler {
     }
     // LOCAL DESTINATION
 
-    // ENCRYPT LEASE SET / OPTIONAL LOOKUP
+    // ENCRYPT LEASE SET
+    private String getEncryptLeaseSet(Map<String, Object> inParams) {
+        return (String) inParams.get("EncryptLeaseSet");
+    }
+
+
+    // Optional lookup | Only certain LeaseSets support this, if one doesn't remove any pre-existing passwords.
+    private String getOptionalLookup(Map<String, Object> inParams) {
+        return (String) inParams.get("OptionalLookup");
+    }
 
 
     // CLIENT CONNECTIONS
@@ -679,6 +691,32 @@ public class TunnelManagerHandler implements RequestHandler {
 
     // --- Set properties, allows us to set based on the API body --- \\\
 
+    // TODO: USE TUNNEL MANAGEMENT FUNCTION THIS IS JUST FOR TESTING AT THE MOMENT
+    private void setProfile(Properties config, Map<String, Object> inParams, String type) {
+        String profile = getProfile(inParams);
+        if ("interactive".equals(profile))
+            config.setProperty(OPT + PROP_STREAMING_MAX_WINDOW_SIZE, "16");
+        else
+            config.remove(OPT + PROP_STREAMING_MAX_WINDOW_SIZE);
+    }
+
+    private void setReduceTunnelQuantityIdle(Properties config, Map<String, Object> inParams, String type) {
+        Integer reduceCount = getReduceCount(inParams);
+        Integer reduceTime = getReduceTime(inParams);
+        if (reduceCount != null)
+            config.setProperty(OPT + PROP_REDUCE_QUANTITY, Integer.toString(reduceCount));
+
+        if (reduceTime != null)
+            config.setProperty(OPT + PROP_REDUCE_IDLE_TIME, Integer.toString(reduceTime * 60 * 1000));
+
+    }
+
+    private void setReduce(Properties config, Map<String, Object> inParams, String type) {
+        config.setProperty(OPT + PROP_REDUCE_ON_IDLE, Boolean.toString(getReduce(inParams)));
+    }
+    // TODO: USE TUNNELMANAGEMENT FUNCTION THIS IS JUST FOR TESTING AT THE MOMENT
+
+
     private void setInboundConnections(Properties config, Map<String, Object> inParams, String type) {
         Integer clientPerMinute = getClientPerMinute(inParams);
         Integer clientPerHour = getClientPerHour(inParams);
@@ -718,6 +756,8 @@ public class TunnelManagerHandler implements RequestHandler {
         config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, totalPeriod != null ? Integer.toString(totalPeriod) : null);
         config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX, perClientPeriod != null ? Integer.toString(perClientPeriod) : null);
     }
+
+
 
 
     // TODO: Remember that http is target-port , some may vary slightly
