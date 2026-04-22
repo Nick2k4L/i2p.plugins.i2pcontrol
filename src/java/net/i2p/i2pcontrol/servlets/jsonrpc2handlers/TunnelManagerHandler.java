@@ -267,6 +267,30 @@ public class TunnelManagerHandler implements RequestHandler {
     //  - Server Throttling
     //  - Encrypt Leaseset
 
+    // TODO Services Checklist:
+    //  []
+    //  [X] Tunnel Options
+    //  [X] Post Limits
+    //  []
+    //  []
+    //  []
+    //  []
+
+    // Creating a hidden service
+    private List<String> createService(Map<String, Object> inParams, String type) throws IOException {
+        Properties config = new Properties();
+        setCommon(config, inParams, type);
+        setTunnelClientEndpointOptions(config, inParams, type);
+        setPosts(config, inParams, type);
+
+        TunnelController controller = new TunnelController(config, "");
+        _group.addController(controller);
+        _group.saveConfig(controller);
+        if (controller.getStartOnLoad())
+            controller.startTunnelBackground();
+        return controller.clearMessages();
+    }
+
 
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
     private String getType(Map<String, Object> inParams) {
@@ -581,6 +605,21 @@ public class TunnelManagerHandler implements RequestHandler {
         return postBanTimeObj != null ? ((Number) postBanTimeObj).intValue() : null;
     }
 
+    private Integer getPerClientPeriod(Map<String, Object> inParams) {
+        Object perClientPeriodObj = inParams.get("PerClientPeriod");
+        return perClientPeriodObj != null ? ((Number) perClientPeriodObj).intValue() : null;
+    }
+
+    private Integer getTotalPeriod(Map<String, Object> inParams) {
+        Object totalPeriodObj = inParams.get("TotalPeriod");
+        return totalPeriodObj != null ? ((Number) totalPeriodObj).intValue() : null;
+    }
+
+    private Integer getTotalBanTime(Map<String, Object> inParams) {
+        Object totalBanTimeObj = inParams.get("TotalBanTime");
+        return totalBanTimeObj != null ? ((Number) totalBanTimeObj).intValue() : null;
+    }
+
 
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
 
@@ -590,9 +629,16 @@ public class TunnelManagerHandler implements RequestHandler {
     private void setPosts(Properties config, Map<String, Object> inParams, String type) {
         Integer postLimitPeriod = getPostLimitPeriod(inParams);
         Integer postBanTime = getPostBanTime(inParams);
+        Integer totalBanTime = getTotalBanTime(inParams);
+        Integer perClientPeriod = getPerClientPeriod(inParams);
+        Integer totalPeriod = getTotalPeriod(inParams);
+
 
         config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, postLimitPeriod != null ? Integer.toString(postLimitPeriod) : null);
         config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, postBanTime != null ? Integer.toString(postBanTime) : null);
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, totalBanTime != null ? Integer.toString(totalBanTime) : null);
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, totalPeriod != null ? Integer.toString(totalPeriod) : null);
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX, perClientPeriod != null ? Integer.toString(perClientPeriod) : null);
     }
 
 
