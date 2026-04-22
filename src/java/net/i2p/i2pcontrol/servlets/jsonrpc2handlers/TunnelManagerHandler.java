@@ -10,10 +10,7 @@ import net.i2p.crypto.EncType;
 import net.i2p.crypto.KeyGenerator;
 import net.i2p.crypto.KeyPair;
 import net.i2p.crypto.SigType;
-import net.i2p.data.Base64;
-import net.i2p.data.DataHelper;
-import net.i2p.data.Hash;
-import net.i2p.data.SimpleDataStructure;
+import net.i2p.data.*;
 import net.i2p.i2ptunnel.*;
 import net.i2p.i2ptunnel.socks.I2PSOCKSTunnel;
 import net.i2p.router.RouterContext;
@@ -62,6 +59,9 @@ public class TunnelManagerHandler implements RequestHandler {
     private static final String PROP_MAX_TOTAL_CONNS_MIN = "i2p.streaming.maxTotalConnsPerMinute";
     private static final String PROP_MAX_TOTAL_CONNS_HOUR = "i2p.streaming.maxTotalConnsPerHour";
     private static final String PROP_MAX_TOTAL_CONNS_DAY = "i2p.streaming.maxTotalConnsPerDay";
+
+    private static final String PROP_ENABLE_ACCESS_LIST = "i2cp.enableAccessList";
+    private static final String PROP_ENABLE_BLACKLIST = "i2cp.enableBlackList";
 
     private static final String[] NO_SHOW_OPTS = {
         "inbound.length", "outbound.length", "inbound.lengthVariance", "outbound.lengthVariance",
@@ -297,6 +297,7 @@ public class TunnelManagerHandler implements RequestHandler {
         setReduceTunnelQuantityIdle(config, inParams, type);
         setReduce(config, inParams, type);
         setServerAccessOptions(config, inParams, type);
+        setRestrictedAccessList(config, inParams, type);
 
 
         TunnelController controller = new TunnelController(config, "");
@@ -636,6 +637,21 @@ public class TunnelManagerHandler implements RequestHandler {
     }
     // --- Server Access Options --- \\
 
+    // -- Tunnel Access Control Options -- \\
+
+    private String getAccessOption(Map<String, Object> inParams) {
+        return (String) inParams.get("AccessOption");
+    }
+
+    private String getAccessList(Map<String, Object> inParams) {
+        return (String) inParams.get("AccessList");
+    }
+
+    private String getFilePathFilter(Map<String, Object> inParams) {
+        return (String) inParams.get("FilterFilePath");
+    }
+
+
 
 
     // CLIENT CONNECTIONS
@@ -714,6 +730,23 @@ public class TunnelManagerHandler implements RequestHandler {
 
 
     // --- Set properties, allows us to set based on the API body --- \\\
+
+    private void setRestrictedAccessList(Properties config, Map<String, Object> inParams, String type){
+        String accessMode = getAccessOption(inParams);
+
+        switch (accessMode){
+            case "allow":
+                config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, String.valueOf(true));
+                break;
+            case "deny":
+                config.setProperty(OPT + PROP_ENABLE_BLACKLIST, String.valueOf(true));
+                break;
+        }
+
+        setAccessList(getAccessList(inParams), config);
+        config.setProperty(TunnelController.PROP_FILTER, getFilePathFilter(inParams));
+
+    }
 
     private void setServerAccessOptions(Properties config, Map<String, Object> inParams, String type) {
         boolean multiHoming = getMultiHoming(inParams);
@@ -1304,6 +1337,30 @@ public class TunnelManagerHandler implements RequestHandler {
                 continue;
             if (!key.isEmpty())
                 config.setProperty(OPT + key, value);
+        }
+    }
+
+    private void setAccessList(String val, Properties config) {
+        if (val != null) {
+            val = val.trim().replace("\r\n", ",").replace("\n", ",").replace(" ", ",");
+            // Convert to B64 to save space
+            String[] vals = DataHelper.split(val, ",");
+            StringBuilder buf = new StringBuilder(val.length());
+            for (int i = 0; i < vals.length; i++) {
+                String v = vals[i];
+                int len = v.length();
+                if (len == 0)
+                    continue;
+                if (len == 60 && v.endsWith(".b32.i2p")) {
+                    byte[] b = Base32.decode(v.substring(0, 52));
+                    if (b != null)
+                        v = Base64.encode(b);
+                }
+                buf.append(v);
+                if (i != vals.length - 1)
+                    buf.append(',');
+            }
+            config.setProperty(OPT + "i2cp.accessList", buf.toString());
         }
     }
 
