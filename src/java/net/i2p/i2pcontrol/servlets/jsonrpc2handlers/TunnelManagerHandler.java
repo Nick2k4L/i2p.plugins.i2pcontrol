@@ -296,6 +296,7 @@ public class TunnelManagerHandler implements RequestHandler {
         setProfile(config, inParams, type);
         setReduceTunnelQuantityIdle(config, inParams, type);
         setReduce(config, inParams, type);
+        setServerAccessOptions(config, inParams, type);
 
 
         TunnelController controller = new TunnelController(config, "");
@@ -613,6 +614,29 @@ public class TunnelManagerHandler implements RequestHandler {
         return (String) inParams.get("OptionalLookup");
     }
 
+    // --- Server Access Options --- \\
+    private boolean getBlockAccessInProxies(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("BlockAccessInProxies"));
+    }
+
+    private boolean getBlockUserAgents(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("BlockUserAgents"));
+    }
+
+    private boolean getUniqueLocalAddressPerClient(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("UniqueLocalAddressPerClient"));
+    }
+
+    private boolean getBlockReferers(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("BlockReferers"));
+    }
+
+    private boolean getMultiHoming(Map<String, Object> inParams) {
+        return Boolean.TRUE.equals(inParams.get("MultiHoming"));
+    }
+    // --- Server Access Options --- \\
+
+
 
     // CLIENT CONNECTIONS
 
@@ -690,6 +714,19 @@ public class TunnelManagerHandler implements RequestHandler {
 
 
     // --- Set properties, allows us to set based on the API body --- \\\
+
+    private void setServerAccessOptions(Properties config, Map<String, Object> inParams, String type) {
+        boolean multiHoming = getMultiHoming(inParams);
+        if (TunnelController.TYPE_HTTP_SERVER.equals(type) || TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_INPROXY, Boolean.toString(getBlockAccessInProxies(inParams)));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_USER_AGENTS ,Boolean.toString(getBlockUserAgents(inParams)));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_REFERER, Boolean.toString(getBlockReferers(inParams)));
+        }
+
+        config.setProperty(OPT + "shouldBundleReplyInfo", Boolean.toString(multiHoming));
+        config.setProperty(OPT +  I2PTunnelServer.PROP_UNIQUE_LOCAL, Boolean.toString(getUniqueLocalAddressPerClient(inParams)));
+
+    }
 
     // TODO: USE TUNNEL MANAGEMENT FUNCTION THIS IS JUST FOR TESTING AT THE MOMENT
     private void setProfile(Properties config, Map<String, Object> inParams, String type) {
