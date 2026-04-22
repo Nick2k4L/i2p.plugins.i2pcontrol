@@ -54,6 +54,15 @@ public class TunnelManagerHandler implements RequestHandler {
     private static final String PROP_REDUCE_IDLE_TIME = "i2cp.reduceIdleTime";
     private static final String PROP_CLOSE_IDLE_TIME = "i2cp.closeIdleTime";
     private static final String SHARED_CLIENT_NICKNAME = "shared clients";
+
+    private static final String PROP_MAX_STREAMS = "i2p.streaming.maxConcurrentStreams";
+    private static final String PROP_MAX_CONNS_MIN = "i2p.streaming.maxConnsPerMinute";
+    private static final String PROP_MAX_CONNS_HOUR = "i2p.streaming.maxConnsPerHour";
+    private static final String PROP_MAX_CONNS_DAY = "i2p.streaming.maxConnsPerDay";
+    private static final String PROP_MAX_TOTAL_CONNS_MIN = "i2p.streaming.maxTotalConnsPerMinute";
+    private static final String PROP_MAX_TOTAL_CONNS_HOUR = "i2p.streaming.maxTotalConnsPerHour";
+    private static final String PROP_MAX_TOTAL_CONNS_DAY = "i2p.streaming.maxTotalConnsPerDay";
+
     private static final String[] NO_SHOW_OPTS = {
         "inbound.length", "outbound.length", "inbound.lengthVariance", "outbound.lengthVariance",
         "inbound.backupQuantity", "outbound.backupQuantity", "inbound.quantity", "outbound.quantity",
@@ -282,6 +291,9 @@ public class TunnelManagerHandler implements RequestHandler {
         setCommon(config, inParams, type);
         setTunnelClientEndpointOptions(config, inParams, type);
         setPosts(config, inParams, type);
+        setConcurrentConnections(config, inParams, type);
+        setInboundConnections(config, inParams, type);
+
 
         TunnelController controller = new TunnelController(config, "");
         _group.addController(controller);
@@ -592,6 +604,45 @@ public class TunnelManagerHandler implements RequestHandler {
 
     // CLIENT CONNECTIONS
 
+    // TODO --- THIS SHOULD GO INTO ONE SERVER THROTTLING SET FUNCTION --- \\
+
+    // MAX CONCURRENT CONNECTIONS
+    private Integer getMaxConcurrentConns(Map<String, Object> inParams) {
+        Object maxConnectionsObj = inParams.get("MaxConcurrentConns");
+        return maxConnectionsObj != null ? ((Number) maxConnectionsObj).intValue() : null;
+    }
+
+    // INBOUND CONNECTION LIMITS
+    private Integer getClientPerMinute(Map<String, Object> inParams) {
+        Object clientPerMinuteObj = inParams.get("ClientPerMinute");
+        return clientPerMinuteObj != null ? ((Number) clientPerMinuteObj).intValue() : null;
+    }
+
+    private Integer getClientPerHour(Map<String, Object> inParams) {
+        Object clientPerHourObj = inParams.get("ClientPerHour");
+        return clientPerHourObj != null ? ((Number) clientPerHourObj).intValue() : null;
+    }
+
+    private Integer getClientPerDay(Map<String, Object> inParams) {
+        Object clientPerDayObj = inParams.get("ClientPerDay");
+        return clientPerDayObj != null ? ((Number) clientPerDayObj).intValue() : null;
+    }
+
+    private Integer getTotalInPerMinute(Map<String, Object> inParams) {
+        Object totalInPerMinuteObj = inParams.get("TotalInPerMinute");
+        return totalInPerMinuteObj != null ? ((Number) totalInPerMinuteObj).intValue() : null;
+    }
+
+    private Integer getTotalInPerHour(Map<String, Object> inParams) {
+        Object totalInPerHourObj = inParams.get("TotalInPerHour");
+        return totalInPerHourObj != null ? ((Number) totalInPerHourObj).intValue() : null;
+    }
+
+    private Integer getTotalInPerDay(Map<String, Object> inParams) {
+        Object totalInPerDayObj = inParams.get("TotalInPerDay");
+        return totalInPerDayObj != null ? ((Number) totalInPerDayObj).intValue() : null;
+    }
+
 
 
     // POST LIMITS
@@ -620,11 +671,38 @@ public class TunnelManagerHandler implements RequestHandler {
         return totalBanTimeObj != null ? ((Number) totalBanTimeObj).intValue() : null;
     }
 
+    // TODO --- THIS SHOULD GO INTO ONE SERVER THROTTLING SET FUNCTION --- \\
+
 
     // --- Common Gets, allows us to reuse validation logic across different types of tunnels --- \\\
 
 
     // --- Set properties, allows us to set based on the API body --- \\\
+
+    private void setInboundConnections(Properties config, Map<String, Object> inParams, String type) {
+        Integer clientPerMinute = getClientPerMinute(inParams);
+        Integer clientPerHour = getClientPerHour(inParams);
+        Integer clientPerDay = getClientPerDay(inParams);
+
+        Integer totalInPerMinute = getTotalInPerMinute(inParams);
+        Integer totalInPerHour = getTotalInPerHour(inParams);
+        Integer totalInPerDay = getTotalInPerDay(inParams);
+
+        config.setProperty(OPT + PROP_MAX_CONNS_MIN, clientPerMinute != null ? Integer.toString(clientPerMinute) : null);
+        config.setProperty(OPT + PROP_MAX_CONNS_HOUR, clientPerHour != null ? Integer.toString(clientPerHour) : null);
+        config.setProperty(OPT + PROP_MAX_CONNS_DAY, clientPerDay != null ? Integer.toString(clientPerDay) : null);
+
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_MIN, totalInPerMinute != null ? Integer.toString(totalInPerMinute) : null);
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_HOUR, totalInPerHour != null ? Integer.toString(totalInPerHour) : null);
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_DAY, totalInPerDay != null ? Integer.toString(totalInPerDay) : null);
+    }
+
+    private void setConcurrentConnections(Properties config, Map<String, Object> inParams, String type) {
+        Integer maxConcurrentConns = getMaxConcurrentConns(inParams);
+
+        config.setProperty(OPT + PROP_MAX_STREAMS, maxConcurrentConns != null ? Integer.toString(maxConcurrentConns) : null);
+
+    }
 
     private void setPosts(Properties config, Map<String, Object> inParams, String type) {
         Integer postLimitPeriod = getPostLimitPeriod(inParams);
@@ -896,22 +974,12 @@ public class TunnelManagerHandler implements RequestHandler {
     }
 
 
-    private List<String> createService(Map<String, Object> inParams, String type) throws IOException {
-        Properties config = new Properties();
-        setCommon(config, inParams, type);
-        setTunnelClientEndpointOptions(config, inParams, type);
-        setPosts(config, inParams, type);
-
-        TunnelController controller = new TunnelController(config, "");
-        _group.addController(controller);
-        _group.saveConfig(controller);
-        if (controller.getStartOnLoad())
-            controller.startTunnelBackground();
-        return controller.clearMessages();
-    }
 
 
 
+
+
+    // Creating a client tunnel.
     private List<String> createClient(Map<String, Object> inParams, String type) throws IOException {
         boolean persistentClientKey = getPersistentClientKey(inParams, type);
         Properties config = new Properties();
