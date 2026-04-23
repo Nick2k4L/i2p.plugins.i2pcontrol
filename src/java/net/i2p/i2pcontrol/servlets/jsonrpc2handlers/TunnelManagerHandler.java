@@ -219,7 +219,6 @@ public class TunnelManagerHandler implements RequestHandler {
         tunnelInfo.put("clientOptionsString", tc.getClientOptions());
         controllerConfig.put("i2cpHost", tc.getI2CPHost());
         controllerConfig.put("i2cpPort", tc.getI2CPPort());
-        controllerConfig.put("listenOnInterface", tc.getListenOnInterface());
         controllerConfig.put("listenPort", tc.getListenPort());
         controllerConfig.put("targetHost", tc.getTargetHost());
         controllerConfig.put("targetPort", tc.getTargetPort());
