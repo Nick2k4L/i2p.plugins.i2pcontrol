@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
@@ -299,9 +300,13 @@ public class TunnelManagerHandler implements RequestHandler {
     private List<String> createService(Map<String, Object> inParams, String type) throws IOException {
         Properties config = new Properties();
         setCommon(config, inParams, type);
+        setTunnelClientEndpointOptions(config, inParams, type);
+        setServiceEndpointOptions(config, inParams, type);
+        setCustomOptions(config, inParams);
+        setTunnelLengthOptions(config, inParams);
+        setTunnelQuantityOptions(config, inParams);
         setTunnelCryptographyOptions(config, inParams);
         setEncryptLeaseSetOptions(config, inParams);
-        setTunnelClientEndpointOptions(config, inParams, type);
         setPosts(config, inParams, type);
         setConcurrentConnections(config, inParams, type);
         setInboundConnections(config, inParams, type);
@@ -310,6 +315,7 @@ public class TunnelManagerHandler implements RequestHandler {
         setReduce(config, inParams, type);
         setServerAccessOptions(config, inParams, type);
         setRestrictedAccessList(config, inParams, type);
+        finalizeServiceConfig(config, type);
 
         TunnelController controller = new TunnelController(config, "");
         _group.addController(controller);
@@ -396,6 +402,16 @@ public class TunnelManagerHandler implements RequestHandler {
     private String getTargetHost(Map<String, Object> inParams) {
         String targetHost = (String) inParams.get("TargetHost");
         return targetHost != null ? targetHost : (String) inParams.get("Host");
+    }
+
+    private Integer getTargetPort(Map<String, Object> inParams) {
+        Object targetPortObj = inParams.get("TargetPort");
+        return targetPortObj != null ? ((Number) targetPortObj).intValue() : null;
+    }
+
+    private String getWebsiteHostname(Map<String, Object> inParams) {
+        String websiteHostname = (String) inParams.get("WebsiteHostname");
+        return websiteHostname != null ? websiteHostname : (String) inParams.get("SpoofedHost");
     }
 
     private String getSSLProxies(Map<String, Object> inParams) {
@@ -783,6 +799,11 @@ public class TunnelManagerHandler implements RequestHandler {
         return totalBanTimeObj != null ? ((Number) totalBanTimeObj).intValue() : null;
     }
 
+    private String getHostName(Map<String, Object> inParams) {
+        return (String) inParams.get("HostName");
+    }
+
+
     // TODO --- THIS SHOULD GO INTO ONE SERVER THROTTLING SET FUNCTION --- \\
 
 
@@ -793,6 +814,8 @@ public class TunnelManagerHandler implements RequestHandler {
 
     private void setRestrictedAccessList(Properties config, Map<String, Object> inParams, String type){
         String accessMode = getAccessOption(inParams);
+        String filePathFilter = getFilePathFilter(inParams);
+        String accessList = getAccessList(inParams);
         config.remove(OPT + PROP_ENABLE_ACCESS_LIST);
         config.remove(OPT + PROP_ENABLE_BLACKLIST);
 
@@ -807,8 +830,12 @@ public class TunnelManagerHandler implements RequestHandler {
             }
         }
 
-        setAccessList(getAccessList(inParams), config);
-        config.setProperty(TunnelController.PROP_FILTER, getFilePathFilter(inParams));
+        if (accessList != null) {
+            setAccessList(accessList, config);
+        }
+
+        if (filePathFilter != null)
+            config.setProperty(TunnelController.PROP_FILTER, filePathFilter);
 
     }
 
@@ -818,7 +845,7 @@ public class TunnelManagerHandler implements RequestHandler {
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_INPROXY, Boolean.toString(getBlockAccessInProxies(inParams)));
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_USER_AGENTS ,Boolean.toString(getBlockUserAgents(inParams)));
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_REFERER, Boolean.toString(getBlockReferers(inParams)));
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS, getUserAgents(inParams));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS, Objects.toString(getUserAgents(inParams), ""));
         }
 
         config.setProperty(OPT + "shouldBundleReplyInfo", Boolean.toString(multiHoming));
@@ -852,6 +879,7 @@ public class TunnelManagerHandler implements RequestHandler {
     // TODO: USE TUNNELMANAGEMENT FUNCTION THIS IS JUST FOR TESTING AT THE MOMENT
 
 
+    // TODO: Remove hardcoded ints
     private void setInboundConnections(Properties config, Map<String, Object> inParams, String type) {
         Integer clientPerMinute = getClientPerMinute(inParams);
         Integer clientPerHour = getClientPerHour(inParams);
@@ -861,19 +889,19 @@ public class TunnelManagerHandler implements RequestHandler {
         Integer totalInPerHour = getTotalInPerHour(inParams);
         Integer totalInPerDay = getTotalInPerDay(inParams);
 
-        config.setProperty(OPT + PROP_MAX_CONNS_MIN, clientPerMinute != null ? Integer.toString(clientPerMinute) : null);
-        config.setProperty(OPT + PROP_MAX_CONNS_HOUR, clientPerHour != null ? Integer.toString(clientPerHour) : null);
-        config.setProperty(OPT + PROP_MAX_CONNS_DAY, clientPerDay != null ? Integer.toString(clientPerDay) : null);
+        config.setProperty(OPT + PROP_MAX_CONNS_MIN, clientPerMinute != null ? Integer.toString(clientPerMinute) : Integer.toString(30));
+        config.setProperty(OPT + PROP_MAX_CONNS_HOUR, clientPerHour != null ? Integer.toString(clientPerHour) : Integer.toString(80));
+        config.setProperty(OPT + PROP_MAX_CONNS_DAY, clientPerDay != null ? Integer.toString(clientPerDay) : Integer.toString(200));
 
-        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_MIN, totalInPerMinute != null ? Integer.toString(totalInPerMinute) : null);
-        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_HOUR, totalInPerHour != null ? Integer.toString(totalInPerHour) : null);
-        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_DAY, totalInPerDay != null ? Integer.toString(totalInPerDay) : null);
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_MIN, totalInPerMinute != null ? Integer.toString(totalInPerMinute) : Integer.toString(50));
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_HOUR, totalInPerHour != null ? Integer.toString(totalInPerHour) : Integer.toString(0));
+        config.setProperty(OPT + PROP_MAX_TOTAL_CONNS_DAY, totalInPerDay != null ? Integer.toString(totalInPerDay) : Integer.toString(0));
     }
 
     private void setConcurrentConnections(Properties config, Map<String, Object> inParams, String type) {
         Integer maxConcurrentConns = getMaxConcurrentConns(inParams);
 
-        config.setProperty(OPT + PROP_MAX_STREAMS, maxConcurrentConns != null ? Integer.toString(maxConcurrentConns) : null);
+        config.setProperty(OPT + PROP_MAX_STREAMS, maxConcurrentConns != null ? Integer.toString(maxConcurrentConns) : Integer.toString(30));
 
     }
 
@@ -885,11 +913,11 @@ public class TunnelManagerHandler implements RequestHandler {
         Integer totalPeriod = getTotalPeriod(inParams);
 
 
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, postLimitPeriod != null ? Integer.toString(postLimitPeriod) : null);
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, postBanTime != null ? Integer.toString(postBanTime) : null);
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, totalBanTime != null ? Integer.toString(totalBanTime) : null);
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, totalPeriod != null ? Integer.toString(totalPeriod) : null);
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX, perClientPeriod != null ? Integer.toString(perClientPeriod) : null);
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, postLimitPeriod != null ? Integer.toString(postLimitPeriod) : Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_WINDOW));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, postBanTime != null ? Integer.toString(postBanTime) : Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_BAN_TIME));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, totalBanTime != null ? Integer.toString(totalBanTime) : Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_TOTAL_BAN_TIME));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, totalPeriod != null ? Integer.toString(totalPeriod) : Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_TOTAL_MAX));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX, perClientPeriod != null ? Integer.toString(perClientPeriod) : Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_MAX));
     }
 
 
@@ -943,6 +971,63 @@ public class TunnelManagerHandler implements RequestHandler {
                 config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_MIN, "5");
                 config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_HOUR, "25");
             }
+        }
+    }
+
+    private void setServiceEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
+        String privKeyFile = getPrivKeyFile(inParams);
+        if (privKeyFile != null && !privKeyFile.trim().isEmpty())
+            config.setProperty(TunnelController.PROP_FILE, privKeyFile.trim());
+        else
+            config.setProperty(TunnelController.PROP_FILE, getDefaultPrivateKeyFile());
+
+        if (!TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
+            Integer targetPort = getTargetPort(inParams);
+            if (targetPort == null)
+                targetPort = Integer.valueOf(getPort(inParams));
+            config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(targetPort.intValue()));
+
+            String targetHost = getTargetHost(inParams);
+            if (targetHost != null && !targetHost.trim().isEmpty())
+                config.setProperty(TunnelController.PROP_TARGET_HOST, targetHost.trim());
+            else
+                config.setProperty(TunnelController.PROP_TARGET_HOST, "127.0.0.1");
+
+            config.setProperty(OPT + I2PTunnelServer.PROP_USE_SSL,
+                               Boolean.toString(getUseSSL(inParams)));
+        }
+
+        if (TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
+            String reachableBy = getReachableBy(inParams);
+            if (reachableBy != null && !reachableBy.trim().isEmpty())
+                config.setProperty(TunnelController.PROP_INTFC, reachableBy.trim());
+            else {
+                String targetHost = getTargetHost(inParams);
+                if (targetHost != null && !targetHost.trim().isEmpty())
+                    config.setProperty(TunnelController.PROP_INTFC, targetHost.trim());
+                else
+                    config.setProperty(TunnelController.PROP_INTFC, "");
+            }
+        } else if (TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
+            String reachableBy = getReachableBy(inParams);
+            if (reachableBy != null && !reachableBy.trim().isEmpty())
+                config.setProperty(TunnelController.PROP_INTFC, reachableBy.trim());
+            else
+                config.setProperty(TunnelController.PROP_INTFC, "");
+        }
+
+        if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||
+            TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
+            String websiteHostname = getWebsiteHostname(inParams);
+            if (websiteHostname != null && !websiteHostname.trim().isEmpty())
+                config.setProperty(TunnelController.PROP_SPOOFED_HOST, websiteHostname.trim());
+            else
+                config.remove(TunnelController.PROP_SPOOFED_HOST);
+        }
+
+        if (!TunnelController.TYPE_HTTP_SERVER.equals(type) &&
+            !TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
+            config.setProperty(TunnelController.OPT_BUNDLE_REPLY, "true");
         }
     }
 
@@ -1371,6 +1456,67 @@ public class TunnelManagerHandler implements RequestHandler {
         if ((TunnelController.TYPE_STD_CLIENT.equals(type) || TunnelController.TYPE_IRC_CLIENT.equals(type)) &&
             Boolean.parseBoolean(config.getProperty(OPT + I2PTunnelClientBase.PROP_USE_SSL))) {
             ensureClientSSLKeyStore(config);
+        }
+    }
+
+    private void finalizeServiceConfig(Properties config, String type) {
+        String p = OPT + "inbound.randomKey";
+        if (!config.containsKey(p)) {
+            byte[] rk = new byte[32];
+            _context.random().nextBytes(rk);
+            config.setProperty(p, Base64.encode(rk));
+            p = OPT + "outbound.randomKey";
+            _context.random().nextBytes(rk);
+            config.setProperty(p, Base64.encode(rk));
+        }
+
+        String defaultEncType;
+        if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||
+            TunnelController.TYPE_IRC_SERVER.equals(type) ||
+            TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
+            defaultEncType = "4";
+        } else {
+            defaultEncType = "4,0";
+        }
+
+        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType", defaultEncType);
+        String leaseSetType = config.getProperty(OPT + "i2cp.leaseSetType", "0");
+        if ("0".equals(encTypes) && "0".equals(leaseSetType)) {
+            p = OPT + "i2cp.leaseSetSigningPrivateKey";
+            if (!config.containsKey(p)) {
+                SigType sigType = SigType.parseSigType(config.getProperty(OPT + I2PClient.PROP_SIGTYPE,
+                                                                         Integer.toString(TunnelController.PREFERRED_SIGTYPE.getCode())));
+                if (sigType != null) {
+                    try {
+                        SimpleDataStructure[] keys = KeyGenerator.getInstance().generateSigningKeys(sigType);
+                        config.setProperty(p, sigType.name() + ':' + keys[1].toBase64());
+                    } catch (GeneralSecurityException gse) {
+                        // Leave unset if we can't generate it.
+                    }
+                }
+            }
+        }
+
+        p = OPT + "i2cp.leaseSetPrivateKey";
+        String existingKeys = config.getProperty(p);
+        if (existingKeys != null && !existingKeys.isEmpty() && !existingKeys.contains(":")) {
+            existingKeys = "ELGAMAL_2048:" + existingKeys;
+            config.setProperty(p, existingKeys);
+        }
+        for (String encType : DataHelper.split(encTypes, ",")) {
+            EncType parsed = EncType.parseEncType(encType);
+            if (parsed == null || !parsed.isAvailable())
+                continue;
+            String typeName = parsed.toString();
+            existingKeys = config.getProperty(p, "");
+            if (!existingKeys.contains(typeName + ':')) {
+                KeyPair keys = KeyGenerator.getInstance().generatePKIKeys(parsed);
+                String newKey = typeName + ':' + keys.getPrivate().toBase64();
+                if (!existingKeys.isEmpty())
+                    config.setProperty(p, existingKeys + ',' + newKey);
+                else
+                    config.setProperty(p, newKey);
+            }
         }
     }
 
