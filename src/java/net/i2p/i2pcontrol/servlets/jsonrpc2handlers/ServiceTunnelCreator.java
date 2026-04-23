@@ -19,6 +19,7 @@ import java.util.Properties;
 
 public class ServiceTunnelCreator {
     private static final String OPT = TunnelController.PFX_OPTION;
+    private static final String PROP_STREAMING_CONNECT_DELAY = "i2p.streaming.connectDelay";
     private static final String PROP_REDUCE_ON_IDLE = "i2cp.reduceOnIdle";
     private static final String PROP_REDUCE_QUANTITY = "i2cp.reduceQuantity";
     private static final String PROP_REDUCE_IDLE_TIME = "i2cp.reduceIdleTime";
@@ -50,6 +51,8 @@ public class ServiceTunnelCreator {
     private static final int DEFAULT_MAX_TOTAL_CONNS_HOUR = 0;
     private static final int DEFAULT_MAX_TOTAL_CONNS_DAY = 0;
 
+    private static final int DEFAULT_MAX_STREAMS = 30;
+
     private final RouterContext _context;
     private final TunnelControllerGroup _group;
     private final TunnelRequestParser _parser;
@@ -64,15 +67,14 @@ public class ServiceTunnelCreator {
 
     public List<String> create(Map<String, Object> inParams, String type) throws IOException {
         Properties config = new Properties();
-        _support.setCommon(config, inParams, type);
-        _support.setTunnelClientEndpointOptions(config, inParams, type);
+        setServiceCommon(config, inParams, type);
         setServiceEndpointOptions(config, inParams, type);
         _support.setCustomOptions(config, inParams);
         _support.setTunnelLengthOptions(config, inParams);
         _support.setTunnelQuantityOptions(config, inParams);
         _support.setTunnelCryptographyOptions(config, inParams);
         setEncryptLeaseSetOptions(config, inParams);
-        setPosts(config, inParams);
+        setPosts(config, inParams, type);
         setConcurrentConnections(config, inParams);
         setInboundConnections(config, inParams);
         setProfile(config, inParams);
@@ -90,6 +92,22 @@ public class ServiceTunnelCreator {
         return controller.clearMessages();
     }
 
+    private void setServiceCommon(Properties config, Map<String, Object> inParams, String type) {
+        String name = _parser.getName(inParams).trim();
+
+        config.setProperty(TunnelController.PROP_TYPE, type);
+        config.setProperty(TunnelController.PROP_NAME, name);
+        config.setProperty(TunnelController.PROP_START, Boolean.toString(_parser.getStartOnLoad(inParams)));
+        config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY,
+                           _parser.getConnectDelay(inParams) ? "500" : "0");
+        config.setProperty(OPT + "inbound.nickname", name);
+        config.setProperty(OPT + "outbound.nickname", name);
+
+        String description = _parser.getDescription(inParams);
+        if (description != null)
+            config.setProperty(TunnelController.PROP_DESCR, description);
+    }
+
     private void setServiceEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
         String privKeyFile = _parser.getPrivKeyFile(inParams);
         if (privKeyFile != null && !privKeyFile.trim().isEmpty())
@@ -97,23 +115,24 @@ public class ServiceTunnelCreator {
         else
             config.setProperty(TunnelController.PROP_FILE, _support.getDefaultPrivateKeyFile());
 
-        if (!TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
-            Integer targetPort = _parser.getTargetPort(inParams);
-            if (targetPort == null)
-                targetPort = _parser.getPort(inParams);
-            config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(targetPort));
+        Integer targetPort = _parser.getTargetPort(inParams);
+        if (targetPort == null)
+            targetPort = _parser.getPort(inParams);
+        config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(targetPort));
 
+        if (!TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
             String targetHost = _parser.getTargetHost(inParams);
             if (targetHost != null && !targetHost.trim().isEmpty())
                 config.setProperty(TunnelController.PROP_TARGET_HOST, targetHost.trim());
             else
                 config.setProperty(TunnelController.PROP_TARGET_HOST, "127.0.0.1");
-
-            config.setProperty(OPT + I2PTunnelServer.PROP_USE_SSL,
-                               Boolean.toString(_parser.getUseSSL(inParams)));
         }
 
+        config.setProperty(OPT + I2PTunnelServer.PROP_USE_SSL,
+                           Boolean.toString(_parser.getUseSSL(inParams)));
+
         if (TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
+            config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(_parser.getPort(inParams)));
             String reachableBy = _parser.getReachableBy(inParams);
             if (reachableBy != null && !reachableBy.trim().isEmpty()) {
                 config.setProperty(TunnelController.PROP_INTFC, reachableBy.trim());
@@ -144,34 +163,35 @@ public class ServiceTunnelCreator {
             config.setProperty(TunnelController.OPT_BUNDLE_REPLY, "true");
     }
 
-    private void setPosts(Properties config, Map<String, Object> inParams) {
+    private void setPosts(Properties config, Map<String, Object> inParams, String type) {
+        if (!TunnelController.TYPE_HTTP_SERVER.equals(type) &&
+            !TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
+            return;
+        }
+
         Integer postLimitPeriod = _parser.getPostLimitPeriod(inParams);
         Integer postBanTime = _parser.getPostBanTime(inParams);
         Integer totalBanTime = _parser.getTotalBanTime(inParams);
         Integer perClientPeriod = _parser.getPerClientPeriod(inParams);
         Integer totalPeriod = _parser.getTotalPeriod(inParams);
 
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW,
-                           postLimitPeriod != null ? Integer.toString(postLimitPeriod) :
-                                                    Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_WINDOW));
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME,
-                           postBanTime != null ? Integer.toString(postBanTime) :
-                                                 Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_BAN_TIME));
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME,
-                           totalBanTime != null ? Integer.toString(totalBanTime) :
-                                                  Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_TOTAL_BAN_TIME));
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX,
-                           totalPeriod != null ? Integer.toString(totalPeriod) :
-                                                 Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_TOTAL_MAX));
-        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX,
-                           perClientPeriod != null ? Integer.toString(perClientPeriod) :
-                                                     Integer.toString(I2PTunnelHTTPServer.DEFAULT_POST_MAX));
+        if (postLimitPeriod != null)
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, Integer.toString(postLimitPeriod));
+        if (postBanTime != null)
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime));
+        if (totalBanTime != null)
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime));
+        if (totalPeriod != null)
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, Integer.toString(totalPeriod));
+        if (perClientPeriod != null)
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_MAX, Integer.toString(perClientPeriod));
     }
 
     private void setConcurrentConnections(Properties config, Map<String, Object> inParams) {
         Integer maxConcurrentConns = _parser.getMaxConcurrentConns(inParams);
+        config.setProperty(OPT + TunnelController.PROP_LIMITS_SET, Boolean.TRUE.toString());
         config.setProperty(OPT + PROP_MAX_STREAMS,
-                           maxConcurrentConns != null ? Integer.toString(maxConcurrentConns) : Integer.toString(30));
+                           maxConcurrentConns != null ? Integer.toString(maxConcurrentConns) : Integer.toString(DEFAULT_MAX_STREAMS));
     }
 
     private void setInboundConnections(Properties config, Map<String, Object> inParams) {
@@ -221,15 +241,19 @@ public class ServiceTunnelCreator {
 
     private void setServerAccessOptions(Properties config, Map<String, Object> inParams, String type) {
         boolean multiHoming = _parser.getMultiHoming(inParams);
-        if (TunnelController.TYPE_HTTP_SERVER.equals(type) || TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type)) {
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_INPROXY,
-                               Boolean.toString(_parser.getBlockAccessInProxies(inParams)));
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_USER_AGENTS,
-                               Boolean.toString(_parser.getBlockUserAgents(inParams)));
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_REFERER,
-                               Boolean.toString(_parser.getBlockReferers(inParams)));
+        boolean isHTTPServer = TunnelController.TYPE_HTTP_SERVER.equals(type) ||
+                               TunnelController.TYPE_HTTP_BIDIR_SERVER.equals(type);
+
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_INPROXY,
+                           Boolean.toString(isHTTPServer && _parser.getBlockAccessInProxies(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_USER_AGENTS,
+                           Boolean.toString(isHTTPServer && _parser.getBlockUserAgents(inParams)));
+        config.setProperty(OPT + I2PTunnelHTTPServer.OPT_REJECT_REFERER,
+                           Boolean.toString(isHTTPServer && _parser.getBlockReferers(inParams)));
+
+        if (isHTTPServer && _parser.getUserAgents(inParams) != null) {
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS,
-                               Objects.toString(_parser.getUserAgents(inParams), ""));
+                               Objects.toString(_parser.getUserAgents(inParams)));
         }
 
         config.setProperty(OPT + "shouldBundleReplyInfo", Boolean.toString(multiHoming));
@@ -241,21 +265,8 @@ public class ServiceTunnelCreator {
         String accessMode = _parser.getAccessOption(inParams);
         String filePathFilter = _parser.getFilePathFilter(inParams);
         String accessList = _parser.getAccessList(inParams);
-        config.remove(OPT + PROP_ENABLE_ACCESS_LIST);
-        config.remove(OPT + PROP_ENABLE_BLACKLIST);
-
-        if (accessMode != null) {
-            switch (accessMode) {
-                case "allow":
-                    config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, String.valueOf(true));
-                    break;
-                case "deny":
-                    config.setProperty(OPT + PROP_ENABLE_BLACKLIST, String.valueOf(true));
-                    break;
-                default:
-                    break;
-            }
-        }
+        config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, Boolean.toString("allow".equals(accessMode)));
+        config.setProperty(OPT + PROP_ENABLE_BLACKLIST, Boolean.toString("deny".equals(accessMode)));
 
         if (accessList != null)
             setAccessList(accessList, config);
