@@ -177,6 +177,12 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
         }
 
+        if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel.options")) {
+            TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
+            outParams.put("i2p.router.net.tunnels.i2ptunnel.options",
+                          extractTunnelOptions(group, inParams.get("i2p.router.net.tunnels.i2ptunnel.options")));
+        }
+
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.inbound",
                           _tunnelInfoHelper.getExploratoryInboundCount());
@@ -462,8 +468,6 @@ public class RouterInfoHandler implements RequestHandler {
         return new JSONRPC2Response(outParams, req.getID());
     }
 
-
-
     private List<Map<String, String>> extractDestinations(Properties opts) {
         List<Map<String, String>> list = new ArrayList<>();
         Map<String, Destination> entries = _context.namingService().getEntries(opts);
@@ -549,6 +553,65 @@ public class RouterInfoHandler implements RequestHandler {
         } catch (Exception ignored) {}
 
         return null;
+    }
+
+    private Object extractTunnelOptions(TunnelControllerGroup group, Object selector) {
+        if (group == null)
+            return Collections.emptyList();
+        if (selector instanceof String) {
+            TunnelController controller = findTunnelControllerByName(group, ((String) selector).trim());
+            return controller != null ? extractTunnelOptions(controller) : null;
+        }
+        List<Map<String, Object>> info = new ArrayList<>();
+        for (TunnelController controller : group.getControllers()) {
+            info.add(extractTunnelOptions(controller));
+        }
+        return info;
+    }
+
+    private TunnelController findTunnelControllerByName(TunnelControllerGroup group, String name) {
+        for (TunnelController controller : group.getControllers()) {
+            if (controller.getName().equals(name))
+                return controller;
+        }
+        return null;
+    }
+
+    private Map<String, Object> extractTunnelOptions(TunnelController tc) {
+        Map<String, Object> tunnelInfo = new LinkedHashMap<>();
+        Properties config = tc.getConfig("");
+        Map<String, String> rawConfig = new TreeMap<>();
+        Map<String, String> optionConfig = new TreeMap<>();
+        Map<String, String> baseConfig = new TreeMap<>();
+
+        for (Map.Entry<Object, Object> entry : config.entrySet()) {
+            String key = (String) entry.getKey();
+            String value = (String) entry.getValue();
+            rawConfig.put(key, value);
+            if (key.startsWith(TunnelController.PFX_OPTION)) {
+                optionConfig.put(key.substring(TunnelController.PFX_OPTION.length()), value);
+            } else {
+                baseConfig.put(key, value);
+            }
+        }
+
+        tunnelInfo.put("name", tc.getName());
+        tunnelInfo.put("type", tc.getType());
+        tunnelInfo.put("client", tc.isClient());
+        tunnelInfo.put("description", tc.getDescription());
+        tunnelInfo.put("status", getTunnelStatus(tc));
+        tunnelInfo.put("rawConfig", rawConfig);
+        tunnelInfo.put("config", baseConfig);
+        tunnelInfo.put("options", optionConfig);
+        return tunnelInfo;
+    }
+
+    private static String getTunnelStatus(TunnelController tc) {
+        if (tc.getIsStandby())
+            return "standby";
+        if (tc.getIsRunning())
+            return "running";
+        return "stopped";
     }
 
 
