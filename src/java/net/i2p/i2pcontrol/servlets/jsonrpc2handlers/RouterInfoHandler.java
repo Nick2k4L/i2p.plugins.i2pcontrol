@@ -155,7 +155,6 @@ public class RouterInfoHandler implements RequestHandler {
             List<Map<String, Object>> info = new ArrayList<>();
             for (TunnelController tc : group.getControllers()) {
                 Map<String, Object> map = new HashMap<>();
-                if (tc.isClient()) {
                     map.put("name", tc.getName());
                     map.put("type", tc.getType());
                     map.put("interface", tc.getListenOnInterface());
@@ -169,11 +168,16 @@ public class RouterInfoHandler implements RequestHandler {
                     else{
                         map.put("status",  "stopped");
                     }
-                    map.put("description", tc.getDescription());
-                    map.put("destination", tc.getDestination());
 
+                    map.put("isClient", tc.isClient());
+                    map.put("hostname", tc.getSpoofedHost());
+                    map.put("destination", tc.getMyDestHashBase32());
+                    map.put("encrypted", getEncryptedBase32(tc));
+                    map.put("ssl", tc.getClientOptionProps().getProperty("useSSL", "false").equals("true"));
+                    map.put("sharedClient", tc.getSharedClient());
+                    map.put("outproxies", tc.getProxyList());
+                    map.put("description", tc.getDescription());
                     info.add(map);
-                }
             }
             outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
         }
