@@ -182,7 +182,7 @@ public class TunnelManagerHandler implements RequestHandler {
         Map<String, Object> tunnelInfo = new LinkedHashMap<>();
         Properties config = tc.getConfig("");
         Map<String, String> rawConfig = new TreeMap<>();
-        Map<String, String> optionConfig = new TreeMap<String, String>();
+        Map<String, String> optionConfig = new TreeMap<>();
         Map<String, String> baseConfig = new TreeMap<>();
         Map<String, Object> controllerConfig = new LinkedHashMap<>();
 
@@ -216,7 +216,8 @@ public class TunnelManagerHandler implements RequestHandler {
         tunnelInfo.put("privateKeyFile", tc.getPrivKeyFile());
         tunnelInfo.put("destination", tc.getMyDestination());
         tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
-        tunnelInfo.put("clientOptionsString", tc.getClientOptions());
+        tunnelInfo.put("clientOptionsString", tc.getClientOptionProps());
+
         controllerConfig.put("i2cpHost", tc.getI2CPHost());
         controllerConfig.put("i2cpPort", tc.getI2CPPort());
         controllerConfig.put("listenPort", tc.getListenPort());
