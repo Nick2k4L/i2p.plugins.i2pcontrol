@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+import net.i2p.crypto.Blinding;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.data.Base64;
@@ -467,6 +468,58 @@ public class RouterInfoHandler implements RequestHandler {
 
         return new JSONRPC2Response(outParams, req.getID());
     }
+
+    private static String getEncryptedBase32(TunnelController tc) {
+        Destination dest = tc.getDestination(); // running tunnels only
+        if (dest == null)
+            return "";
+
+        Properties opts = tc.getClientOptionProps();
+        int mode = getEncryptMode(opts);
+
+        // Matches IndexBean: only blinded LS2 modes have a encrypted b32 address.
+        if (mode > 1 && mode < 10) {
+            boolean hasSecret = !opts.getProperty("i2cp.leaseSetSecret", "").isEmpty();
+            boolean requireSecret = hasSecret && (mode == 3 || mode == 5 || mode == 7 || mode == 9);
+            boolean requireAuth = mode >= 4;
+
+            return Blinding.encode(dest.getSigningPublicKey(), requireSecret, requireAuth);
+        }
+
+        return "";
+    }
+
+    // used indexBean & general helper as a reference, similar logic
+    private static int getEncryptMode(Properties opts) {
+        if (Boolean.parseBoolean(opts.getProperty("i2cp.encryptLeaseSet")))
+            return 1;
+
+        String leaseSetType = opts.getProperty("i2cp.leaseSetType", "1");
+        if ("5".equals(leaseSetType)) {
+            int mode;
+            String authType = opts.getProperty("i2cp.leaseSetAuthType", "0");
+
+            if ("2".equals(authType)) {
+                mode = opts.getProperty("i2cp.leaseSetClient.psk.0") != null ? 6 : 4;
+            } else if ("1".equals(authType)) {
+                mode = 8;
+            } else {
+                mode = 2;
+            }
+
+            if (!opts.getProperty("i2cp.leaseSetSecret", "").isEmpty())
+                mode++;
+
+            return mode;
+        }
+
+        if ("3".equals(leaseSetType))
+            return 10;
+
+        return 0;
+    }
+
+
 
     private List<Map<String, String>> extractDestinations(Properties opts) {
         List<Map<String, String>> list = new ArrayList<>();
