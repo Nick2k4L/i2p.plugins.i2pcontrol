@@ -98,8 +98,15 @@ public class ServiceTunnelCreator {
         config.setProperty(TunnelController.PROP_TYPE, type);
         config.setProperty(TunnelController.PROP_NAME, name);
         config.setProperty(TunnelController.PROP_START, Boolean.toString(_parser.getStartOnLoad(inParams)));
-        config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY,
-                           _parser.getConnectDelay(inParams) ? "500" : "0");
+
+        if (type.equals(TunnelController.TYPE_STD_CLIENT)) {
+            config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY,
+                    _parser.getConnectDelay(inParams) ? "500" : "0");
+        }
+        // explicitly set to zero for everything else
+        else {
+            config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY, "0");
+        }
         config.setProperty(OPT + "inbound.nickname", name);
         config.setProperty(OPT + "outbound.nickname", name);
 
@@ -176,9 +183,9 @@ public class ServiceTunnelCreator {
         Integer totalPeriod = _parser.getTotalPeriod(inParams);
 
         if (postLimitPeriod != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, Integer.toString(postLimitPeriod));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, Integer.toString(postLimitPeriod * 60));
         if (postBanTime != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime * 60));
         if (totalBanTime != null)
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime));
         if (totalPeriod != null)
@@ -218,6 +225,7 @@ public class ServiceTunnelCreator {
                            totalInPerDay != null ? Integer.toString(totalInPerDay) : Integer.toString(DEFAULT_MAX_TOTAL_CONNS_DAY));
     }
 
+    // TODO: Remember this is only for STANDARD CLIENT
     private void setProfile(Properties config, Map<String, Object> inParams) {
         String profile = _parser.getProfile(inParams);
         if ("interactive".equals(profile))
@@ -354,19 +362,27 @@ public class ServiceTunnelCreator {
             config.setProperty(p, Base64.encode(rk));
         }
 
-        String defaultEncType;
-        if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||
-            TunnelController.TYPE_IRC_SERVER.equals(type) ||
-            TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
-            defaultEncType = "4";
-        } else {
-            defaultEncType = "4,0";
-        }
-
-        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType", defaultEncType);
+        String encTypes = getEffectiveLeaseSetEncTypes(config, type);
         String leaseSetType = config.getProperty(OPT + "i2cp.leaseSetType", "0");
+        config.setProperty(OPT + "i2cp.leaseSetEncType", encTypes);
         _support.ensureLeaseSetKeys(config, encTypes, leaseSetType);
 
+    }
+
+    private String getEffectiveLeaseSetEncTypes(Properties config, String type) {
+        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType");
+        if (encTypes != null) {
+            encTypes = encTypes.trim();
+            if (!encTypes.isEmpty() && !"0".equals(encTypes))
+                return encTypes;
+        }
+        if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||
+            TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
+            return "6,4";
+        }
+        if (TunnelController.TYPE_IRC_SERVER.equals(type))
+            return "4";
+        return "4,0";
     }
 
     private void validateBlindedSigType(Properties config) {

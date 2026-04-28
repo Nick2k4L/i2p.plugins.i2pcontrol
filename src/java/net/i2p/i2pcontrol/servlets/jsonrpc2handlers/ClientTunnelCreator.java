@@ -290,8 +290,21 @@ public class ClientTunnelCreator {
         }
 
         String leaseSetType = config.getProperty(OPT + "i2cp.leaseSetType", "0");
-        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType", "4,0");
+        String encTypes = getEffectiveLeaseSetEncTypes(config, config.getProperty(TunnelController.PROP_TYPE));
+        config.setProperty(OPT + "i2cp.leaseSetEncType", encTypes);
         _support.ensureLeaseSetKeys(config, encTypes, leaseSetType);
 
+    }
+
+    private String getEffectiveLeaseSetEncTypes(Properties config, String type) {
+        String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType");
+        if (encTypes != null) {
+            encTypes = encTypes.trim();
+            if (!encTypes.isEmpty() && !"0".equals(encTypes))
+                return encTypes;
+        }
+        if (type != null && type.contains("irc"))
+            return "6,4";
+        return "4,0";
     }
 }

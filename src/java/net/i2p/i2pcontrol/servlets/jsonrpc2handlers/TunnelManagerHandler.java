@@ -54,14 +54,17 @@ public class TunnelManagerHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("All")) {
-            List<String> results = actionToAll(action);
-            if (results != null) {
-                outParams.put("status", "success - " + action);
-                outParams.put("results", results);
+            Boolean all = (Boolean) inParams.get("All");
+            if (all) {
+                List<String> results = actionToAll(action);
+                if (results != null) {
+                    outParams.put("status", "success - " + action);
+                    outParams.put("results", results);
+                    return new JSONRPC2Response(outParams, req.getID());
+                }
+                outParams.put("status", "error - no action");
                 return new JSONRPC2Response(outParams, req.getID());
             }
-            outParams.put("status", "error - no action");
-            return new JSONRPC2Response(outParams, req.getID());
         }
 
         TunnelRequestParser parser = new TunnelRequestParser(_group);
