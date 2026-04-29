@@ -194,26 +194,17 @@ public class TunnelManagerHandler implements RequestHandler {
 
         tunnelInfo.put("client", tc.isClient());
         tunnelInfo.put("status", getTunnelStatusForOptions(tc));
-        tunnelInfo.put("starting", tc.getIsStarting());
-        tunnelInfo.put("standby", tc.getIsStandby());
-        tunnelInfo.put("sharedClient", tc.getSharedClient());
+
         tunnelInfo.put("persistentClientKey", tc.getPersistentClientKey());
         tunnelInfo.put("offlineKeys", tc.getIsOfflineKeys());
-        tunnelInfo.put("listenOnInterface", tc.getListenOnInterface());
-        tunnelInfo.put("listenPort", tc.getListenPort());
+
         tunnelInfo.put("targetDestination", tc.getTargetDestination());
-        tunnelInfo.put("proxyList", tc.getProxyList());
         tunnelInfo.put("destination", tc.getMyDestination());
         tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
 
-//        controllerConfig.put("i2cpHost", tc.getI2CPHost());
-//        controllerConfig.put("i2cpPort", tc.getI2CPPort());
-//        controllerConfig.put("filter", tc.getFilter());
-//        controllerConfig.put("spoofedHost", tc.getSpoofedHost());
         tunnelInfo.put("clientOptions", tc.getClientOptionProps());
         tunnelInfo.put("rawConfig", rawConfig);
-//        tunnelInfo.put("config", baseConfig);
-//        tunnelInfo.put("options", optionConfig);
+
         return tunnelInfo;
     }
 
