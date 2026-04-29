@@ -115,7 +115,7 @@ public class TunnelManagerHandler implements RequestHandler {
                 return new JSONRPC2Response(outParams, req.getID());
             }
             outParams.put("status", "success - options for " + controllerForGet.getName());
-            outParams.put("i2p.router.net.tunnels.i2ptunnel.options", extractTunnelOptions(controllerForGet));
+            outParams.put("info", extractTunnelOptions(controllerForGet));
             return new JSONRPC2Response(outParams, req.getID());
         }
 
@@ -185,59 +185,35 @@ public class TunnelManagerHandler implements RequestHandler {
         Map<String, Object> tunnelInfo = new LinkedHashMap<>();
         Properties config = tc.getConfig("");
         Map<String, String> rawConfig = new TreeMap<>();
-        Map<String, String> optionConfig = new TreeMap<>();
-        Map<String, String> baseConfig = new TreeMap<>();
-        Map<String, Object> controllerConfig = new LinkedHashMap<>();
 
         for (Map.Entry<Object, Object> entry : config.entrySet()) {
             String key = (String) entry.getKey();
             String value = (String) entry.getValue();
             rawConfig.put(key, value);
-            if (key.startsWith(TunnelController.PFX_OPTION))
-                optionConfig.put(key.substring(TunnelController.PFX_OPTION.length()), value);
-            else
-                baseConfig.put(key, value);
         }
 
-        tunnelInfo.put("name", tc.getName());
-        tunnelInfo.put("type", tc.getType());
         tunnelInfo.put("client", tc.isClient());
-        tunnelInfo.put("description", tc.getDescription());
         tunnelInfo.put("status", getTunnelStatusForOptions(tc));
         tunnelInfo.put("starting", tc.getIsStarting());
         tunnelInfo.put("standby", tc.getIsStandby());
-        tunnelInfo.put("startOnLoad", tc.getStartOnLoad());
         tunnelInfo.put("sharedClient", tc.getSharedClient());
         tunnelInfo.put("persistentClientKey", tc.getPersistentClientKey());
         tunnelInfo.put("offlineKeys", tc.getIsOfflineKeys());
         tunnelInfo.put("listenOnInterface", tc.getListenOnInterface());
         tunnelInfo.put("listenPort", tc.getListenPort());
-        tunnelInfo.put("targetHost", tc.getTargetHost());
-        tunnelInfo.put("targetPort", tc.getTargetPort());
         tunnelInfo.put("targetDestination", tc.getTargetDestination());
         tunnelInfo.put("proxyList", tc.getProxyList());
-        tunnelInfo.put("privateKeyFile", tc.getPrivKeyFile());
         tunnelInfo.put("destination", tc.getMyDestination());
         tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
-        tunnelInfo.put("clientOptionsString", tc.getClientOptionProps());
 
-        controllerConfig.put("i2cpHost", tc.getI2CPHost());
-        controllerConfig.put("i2cpPort", tc.getI2CPPort());
-        controllerConfig.put("listenPort", tc.getListenPort());
-        controllerConfig.put("targetHost", tc.getTargetHost());
-        controllerConfig.put("targetPort", tc.getTargetPort());
-        controllerConfig.put("targetDestination", tc.getTargetDestination());
-        controllerConfig.put("proxyList", tc.getProxyList());
-        controllerConfig.put("sharedClient", tc.getSharedClient());
-        controllerConfig.put("startOnLoad", tc.getStartOnLoad());
-        controllerConfig.put("persistentClientKey", tc.getPersistentClientKey());
-        controllerConfig.put("privateKeyFile", tc.getPrivKeyFile());
-        controllerConfig.put("filter", tc.getFilter());
-        controllerConfig.put("spoofedHost", tc.getSpoofedHost());
-        tunnelInfo.put("controller", controllerConfig);
+//        controllerConfig.put("i2cpHost", tc.getI2CPHost());
+//        controllerConfig.put("i2cpPort", tc.getI2CPPort());
+//        controllerConfig.put("filter", tc.getFilter());
+//        controllerConfig.put("spoofedHost", tc.getSpoofedHost());
+        tunnelInfo.put("clientOptions", tc.getClientOptionProps());
         tunnelInfo.put("rawConfig", rawConfig);
-        tunnelInfo.put("config", baseConfig);
-        tunnelInfo.put("options", optionConfig);
+//        tunnelInfo.put("config", baseConfig);
+//        tunnelInfo.put("options", optionConfig);
         return tunnelInfo;
     }
 
