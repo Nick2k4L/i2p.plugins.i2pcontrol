@@ -662,8 +662,8 @@ public class RouterInfoHandler implements RequestHandler {
     }
 
     private static String getTunnelStatus(TunnelController tc) {
-        if (tc.getIsRunning()) return "running";
         if (tc.getIsStandby()) return "standby";
+        if (tc.getIsRunning()) return "running";
         if (tc.getIsStarting())  return "starting";
         return "stopped";
     }
