@@ -161,15 +161,7 @@ public class RouterInfoHandler implements RequestHandler {
                     map.put("port", tc.getListenPort());
                     map.put("targetHost", tc.getTargetHost());
                     map.put("targetPort", tc.getTargetPort());
-                    if (tc.getIsStandby()) {
-                        map.put("status",  "standby");
-                    }
-                    else if (tc.getIsRunning()){
-                        map.put("status",  "running");
-                    }
-                    else{
-                        map.put("status",  "stopped");
-                    }
+                    map.put("status", getTunnelStatus(tc));
 
                     map.put("isClient", tc.isClient());
                     map.put("hostname", tc.getSpoofedHost());
@@ -666,10 +658,9 @@ public class RouterInfoHandler implements RequestHandler {
     }
 
     private static String getTunnelStatus(TunnelController tc) {
-        if (tc.getIsStandby())
-            return "standby";
-        if (tc.getIsRunning())
-            return "running";
+        if (tc.getIsRunning()) return "running";
+        if (tc.getIsStandby()) return "standby";
+        if (tc.getIsStarting())  return "starting";
         return "stopped";
     }
 
