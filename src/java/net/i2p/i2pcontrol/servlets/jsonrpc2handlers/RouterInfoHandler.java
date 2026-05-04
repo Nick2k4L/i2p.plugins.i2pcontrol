@@ -159,6 +159,8 @@ public class RouterInfoHandler implements RequestHandler {
                     map.put("type", tc.getType());
                     map.put("interface", tc.getListenOnInterface());
                     map.put("port", tc.getListenPort());
+                    map.put("targetHost", tc.getTargetHost());
+                    map.put("targetPort", tc.getTargetPort());
                     if (tc.getIsStandby()) {
                         map.put("status",  "standby");
                     }
