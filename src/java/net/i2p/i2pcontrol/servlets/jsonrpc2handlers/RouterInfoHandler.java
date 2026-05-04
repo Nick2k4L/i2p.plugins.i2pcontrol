@@ -171,6 +171,10 @@ public class RouterInfoHandler implements RequestHandler {
                     map.put("sharedClient", tc.getSharedClient());
                     map.put("outproxies", tc.getProxyList());
                     map.put("description", tc.getDescription());
+
+                    map.put("tunnelDestination", tc.getTargetDestination());
+
+
                     info.add(map);
             }
             outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
