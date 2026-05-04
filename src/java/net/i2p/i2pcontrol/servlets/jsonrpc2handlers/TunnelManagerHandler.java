@@ -5,10 +5,14 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Request;
 import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 import com.thetransactioncompany.jsonrpc2.server.MessageContext;
 import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
+import net.i2p.I2PException;
+import net.i2p.data.Destination;
+import net.i2p.data.PrivateKeyFile;
 import net.i2p.i2ptunnel.TunnelController;
 import net.i2p.i2ptunnel.TunnelControllerGroup;
 import net.i2p.router.RouterContext;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -71,6 +75,17 @@ public class TunnelManagerHandler implements RequestHandler {
         TunnelSupport support = new TunnelSupport(_context, _group, parser);
         ClientTunnelCreator clientCreator = new ClientTunnelCreator(_context, _group, parser, support);
         ServiceTunnelCreator serviceCreator = new ServiceTunnelCreator(_context, _group, parser, support);
+
+        if ("edit".equals(action)) {
+            try {
+                clientCreator.edit(inParams, name);
+            } catch (IOException ioe) {
+                outParams.put("status", "error - failed to save tunnel: " + ioe.getMessage());
+                return new JSONRPC2Response(outParams, req.getID());
+            }
+            outParams.put("status", "success - edited tunnel " + name.trim());
+            return new JSONRPC2Response(outParams, req.getID());
+        }
 
         if ("create".equals(action)) {
             try {
@@ -199,13 +214,37 @@ public class TunnelManagerHandler implements RequestHandler {
         tunnelInfo.put("offlineKeys", tc.getIsOfflineKeys());
 
         tunnelInfo.put("targetDestination", tc.getTargetDestination());
+        tunnelInfo.put("localDestination", getDestination(tc.getName()).toBase64());
         tunnelInfo.put("destination", tc.getMyDestination());
         tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
 
-        tunnelInfo.put("clientOptions", tc.getClientOptionProps());
+        //tunnelInfo.put("clientOptions", tc.getClientOptionProps());
         tunnelInfo.put("rawConfig", rawConfig);
 
         return tunnelInfo;
+    }
+
+
+    // from `GeneralHelper.java`
+    private Destination getDestination(String name) {
+        TunnelController tun = findTunnelControllerByName(name);
+        if (tun != null) {
+            Destination rv = tun.getDestination();
+            if (rv != null)
+                return rv;
+            // if not running, do this the hard way
+            File keyFile = tun.getPrivateKeyFile();
+            if (keyFile != null) {
+                PrivateKeyFile pkf = new PrivateKeyFile(keyFile);
+                try {
+                    rv = pkf.getDestination();
+                    if (rv != null)
+                        return rv;
+                } catch (I2PException e) {
+                } catch (IOException e) {}
+            }
+        }
+        return null;
     }
 
     private static String getTunnelStatusForOptions(TunnelController tc) {
