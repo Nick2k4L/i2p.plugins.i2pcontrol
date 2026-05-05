@@ -43,6 +43,8 @@ public class TunnelRequestParser {
 
     public String getNewName(Map<String, Object> inParams) {
        String newName = (String) inParams.get("NewName");
+       if (newName == null || newName.trim().isEmpty())
+           return null;
         if (findTunnelControllerByName(newName.trim()) != null)
             throw new IllegalArgumentException("tunnel " + newName.trim() + " already exists");
         return newName;

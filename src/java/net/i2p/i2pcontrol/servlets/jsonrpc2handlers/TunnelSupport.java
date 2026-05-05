@@ -93,7 +93,9 @@ public class TunnelSupport {
 
     public void setCommon(Properties config, Map<String, Object> inParams, String type, boolean edit) {
         String name = _parser.getName(inParams, edit).trim();
-        String newName = _parser.getNewName(inParams).trim();
+        String newName = _parser.getNewName(inParams);
+        if (newName != null)
+            newName = newName.trim();
 
         config.setProperty(TunnelController.PROP_TYPE, type);
         config.setProperty(TunnelController.PROP_NAME, edit ? newName : name);
