@@ -91,11 +91,12 @@ public class TunnelSupport {
         _parser = parser;
     }
 
-    public void setCommon(Properties config, Map<String, Object> inParams, String type) {
-        String name = _parser.getName(inParams);
+    public void setCommon(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+        String name = _parser.getName(inParams, edit).trim();
+        String newName = _parser.getNewName(inParams).trim();
 
         config.setProperty(TunnelController.PROP_TYPE, type);
-        config.setProperty(TunnelController.PROP_NAME, name.trim());
+        config.setProperty(TunnelController.PROP_NAME, edit ? newName : name);
         config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(_parser.getPort(inParams)));
         config.setProperty(TunnelController.PROP_START, Boolean.toString(_parser.getStartOnLoad(inParams)));
 
@@ -107,8 +108,8 @@ public class TunnelSupport {
             config.setProperty(TunnelController.PROP_DESCR, description);
     }
 
-    public void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
-        String name = _parser.getName(inParams).trim();
+    public void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+        String name = edit ? _parser.getNewName(inParams) : _parser.getName(inParams, false).trim();
         boolean sharedClient = _parser.getSharedClient(inParams, type);
         if (TunnelController.TYPE_STREAMR_CLIENT.equals(type) || TunnelController.TYPE_HTTP_SERVER.equals(type)) {
             String targetHost = _parser.getTargetHost(inParams);
@@ -255,6 +256,14 @@ public class TunnelSupport {
             if (!key.isEmpty())
                 config.setProperty(OPT + key, value);
         }
+    }
+
+    public TunnelController findTunnelControllerByName(String name) {
+        for (TunnelController controller : _group.getControllers()) {
+            if (controller.getName().equals(name))
+                return controller;
+        }
+        return null;
     }
 
 

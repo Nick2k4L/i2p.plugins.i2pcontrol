@@ -67,8 +67,35 @@ public class ServiceTunnelCreator {
 
     public List<String> create(Map<String, Object> inParams, String type) throws IOException {
         Properties config = new Properties();
-        setServiceCommon(config, inParams, type);
-        setServiceEndpointOptions(config, inParams, type);
+        setConfiguration(config, inParams, type, false);
+        finalizeServiceConfig(config, type);
+
+        TunnelController controller = new TunnelController(config, "");
+        _group.addController(controller);
+        _group.saveConfig(controller);
+
+        if (controller.getStartOnLoad())
+            controller.startTunnelBackground();
+        return controller.clearMessages();
+    }
+
+    public void edit(Map<String, Object> inParams, String name) throws IOException {
+        TunnelController controller = _support.findTunnelControllerByName(name);
+        if (controller == null)
+            throw new IllegalArgumentException("Tunnel with name '" + name + "' not found");
+        Properties config = controller.getConfig("");
+        setConfiguration(config, inParams, controller.getType(), true);
+        finalizeServiceConfig(config, controller.getType());
+
+        controller.setConfig(config, "");
+        _group.saveConfig(controller);
+
+        controller.clearMessages();
+    }
+
+    private void setConfiguration(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+        setServiceCommon(config, inParams, type, edit);
+        setServiceEndpointOptions(config, inParams, type, edit);
         _support.setCustomOptions(config, inParams);
         _support.setTunnelLengthOptions(config, inParams);
         _support.setTunnelQuantityOptions(config, inParams);
@@ -82,18 +109,10 @@ public class ServiceTunnelCreator {
         setReduce(config, inParams);
         setServerAccessOptions(config, inParams, type);
         setRestrictedAccessList(config, inParams);
-        finalizeServiceConfig(config, type);
-
-        TunnelController controller = new TunnelController(config, "");
-        _group.addController(controller);
-        _group.saveConfig(controller);
-        if (controller.getStartOnLoad())
-            controller.startTunnelBackground();
-        return controller.clearMessages();
     }
 
-    private void setServiceCommon(Properties config, Map<String, Object> inParams, String type) {
-        String name = _parser.getName(inParams).trim();
+    private void setServiceCommon(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+        String name = edit ? _parser.getNewName(inParams).trim(): _parser.getName(inParams, false).trim();
 
         config.setProperty(TunnelController.PROP_TYPE, type);
         config.setProperty(TunnelController.PROP_NAME, name);
@@ -115,11 +134,11 @@ public class ServiceTunnelCreator {
             config.setProperty(TunnelController.PROP_DESCR, description);
     }
 
-    private void setServiceEndpointOptions(Properties config, Map<String, Object> inParams, String type) {
+    private void setServiceEndpointOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
         String privKeyFile = _parser.getPrivKeyFile(inParams);
         if (privKeyFile != null && !privKeyFile.trim().isEmpty())
             config.setProperty(TunnelController.PROP_FILE, privKeyFile.trim());
-        else
+        else if (!edit || inParams.containsKey("PrivKeyFile") || config.getProperty(TunnelController.PROP_FILE) == null)
             config.setProperty(TunnelController.PROP_FILE, _support.getDefaultPrivateKeyFile());
 
         Integer targetPort = _parser.getTargetPort(inParams);

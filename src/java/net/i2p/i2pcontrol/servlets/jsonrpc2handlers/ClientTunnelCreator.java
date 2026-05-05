@@ -49,8 +49,33 @@ public class ClientTunnelCreator {
     public List<String> create(Map<String, Object> inParams, String type) throws IOException {
         boolean persistentClientKey = _parser.getPersistentClientKey(inParams, type);
         Properties config = new Properties();
-        _support.setCommon(config, inParams, type);
-        _support.setTunnelClientEndpointOptions(config, inParams, type);
+        setConfiguration(config, inParams, type, false);
+        finalizeClientConfig(config, type);
+
+        TunnelController controller = new TunnelController(config, "", persistentClientKey);
+        _group.addController(controller);
+        _group.saveConfig(controller);
+        if (controller.getStartOnLoad())
+            controller.startTunnelBackground();
+        return controller.clearMessages();
+    }
+
+    public void edit(Map<String, Object> inParams, String name) throws IOException {
+        // need to find the tunnel-controller, then edit it / set its fields like above?
+        TunnelController controller = _support.findTunnelControllerByName(name);
+        if (controller == null)   throw new IllegalArgumentException("Tunnel with name '" + name + "' not found");
+        Properties config = controller.getConfig("");
+        setConfiguration(config, inParams, controller.getType(), true);
+        finalizeClientConfig(config, controller.getType());
+        controller.setConfig(config, "");
+        _group.saveConfig(controller);
+
+        controller.clearMessages();
+    }
+
+    private void setConfiguration(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+        _support.setCommon(config, inParams, type, edit);
+        _support.setTunnelClientEndpointOptions(config, inParams, type, edit);
         setTunnelDestinationOptions(config, inParams, type);
         _support.setCustomOptions(config, inParams);
         setTunnelProxyOptions(config, inParams, type);
@@ -61,14 +86,6 @@ public class ClientTunnelCreator {
         _support.setTunnelLengthOptions(config, inParams);
         _support.setTunnelQuantityOptions(config, inParams);
         _support.setTunnelCryptographyOptions(config, inParams);
-        finalizeClientConfig(config, type);
-
-        TunnelController controller = new TunnelController(config, "", persistentClientKey);
-        _group.addController(controller);
-        _group.saveConfig(controller);
-        if (controller.getStartOnLoad())
-            controller.startTunnelBackground();
-        return controller.clearMessages();
     }
 
     private void setTunnelDestinationOptions(Properties config, Map<String, Object> inParams, String type) {

@@ -78,7 +78,18 @@ public class TunnelManagerHandler implements RequestHandler {
 
         if ("edit".equals(action)) {
             try {
-                clientCreator.edit(inParams, name);
+                TunnelController controllerForEdit = findTunnelControllerByName(name.trim());
+                if (controllerForEdit == null) {
+                    outParams.put("status", "error - tunnel " + name.trim() + " not found");
+                    return new JSONRPC2Response(outParams, req.getID());
+                }
+
+                if (controllerForEdit.isClient()) {
+                    clientCreator.edit(inParams, name);
+                } else {
+                    serviceCreator.edit(inParams, name);
+                }
+
             } catch (IOException ioe) {
                 outParams.put("status", "error - failed to save tunnel: " + ioe.getMessage());
                 return new JSONRPC2Response(outParams, req.getID());
@@ -213,10 +224,14 @@ public class TunnelManagerHandler implements RequestHandler {
         tunnelInfo.put("persistentClientKey", tc.getPersistentClientKey());
         tunnelInfo.put("offlineKeys", tc.getIsOfflineKeys());
 
+        Destination localDestination = getDestination(tc.getName());
+        String localDestinationBase64 = localDestination != null ? localDestination.toBase64() : null;
+
         tunnelInfo.put("targetDestination", tc.getTargetDestination());
-        tunnelInfo.put("localDestination", getDestination(tc.getName()).toBase64());
-        tunnelInfo.put("destination", tc.getMyDestination());
-        tunnelInfo.put("destinationB32", tc.getMyDestHashBase32());
+        tunnelInfo.put("localDestination", localDestinationBase64);
+        tunnelInfo.put("destination", localDestinationBase64);
+        tunnelInfo.put("destinationB32", localDestination != null ? localDestination.toBase32() : null);
+
 
         //tunnelInfo.put("clientOptions", tc.getClientOptionProps());
         tunnelInfo.put("rawConfig", rawConfig);
