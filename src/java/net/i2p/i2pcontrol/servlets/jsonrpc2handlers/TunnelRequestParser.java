@@ -30,13 +30,22 @@ public class TunnelRequestParser {
         return type.trim();
     }
 
-    public String getName(Map<String, Object> inParams) {
+    public String getName(Map<String, Object> inParams, boolean edit) {
         String name = (String) inParams.get("Name");
         if (name == null || name.trim().isEmpty())
             throw new IllegalArgumentException("Name is required");
-        if (findTunnelControllerByName(name.trim()) != null)
-            throw new IllegalArgumentException("tunnel " + name.trim() + " already exists");
+        if (!edit) {
+            if (findTunnelControllerByName(name.trim()) != null)
+                throw new IllegalArgumentException("tunnel " + name.trim() + " already exists");
+        }
         return name;
+    }
+
+    public String getNewName(Map<String, Object> inParams) {
+       String newName = (String) inParams.get("NewName");
+        if (findTunnelControllerByName(newName.trim()) != null)
+            throw new IllegalArgumentException("tunnel " + newName.trim() + " already exists");
+        return newName;
     }
 
     public int getPort(Map<String, Object> inParams) {
