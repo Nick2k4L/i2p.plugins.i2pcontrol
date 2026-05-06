@@ -208,7 +208,7 @@ public class ServiceTunnelCreator {
         if (postBanTime != null)
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime * 60));
         if (totalBanTime != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime * 60));
         if (totalPeriod != null)
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, Integer.toString(totalPeriod));
         if (perClientPeriod != null)
