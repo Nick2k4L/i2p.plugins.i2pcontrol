@@ -317,7 +317,7 @@ public class ClientTunnelCreator {
         String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType");
         if (encTypes != null) {
             encTypes = encTypes.trim();
-            if (!encTypes.isEmpty() && !"0".equals(encTypes))
+            if (!encTypes.isEmpty())
                 return encTypes;
         }
         if (type != null && type.contains("irc"))
