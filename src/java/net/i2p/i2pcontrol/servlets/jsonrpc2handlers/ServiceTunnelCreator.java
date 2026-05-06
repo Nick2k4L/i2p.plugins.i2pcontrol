@@ -112,7 +112,9 @@ public class ServiceTunnelCreator {
     }
 
     private void setServiceCommon(Properties config, Map<String, Object> inParams, String type, boolean edit) {
-        String name = edit ? _parser.getNewName(inParams).trim(): _parser.getName(inParams, false).trim();
+        String name = _parser.getName(inParams, edit).trim();
+        if (_parser.getNewName(inParams) != null)
+            name = _parser.getNewName(inParams).trim();
 
         config.setProperty(TunnelController.PROP_TYPE, type);
         config.setProperty(TunnelController.PROP_NAME, name);
@@ -392,7 +394,7 @@ public class ServiceTunnelCreator {
         String encTypes = config.getProperty(OPT + "i2cp.leaseSetEncType");
         if (encTypes != null) {
             encTypes = encTypes.trim();
-            if (!encTypes.isEmpty() && !"0".equals(encTypes))
+            if (!encTypes.isEmpty())
                 return encTypes;
         }
         if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||

@@ -92,13 +92,13 @@ public class TunnelSupport {
     }
 
     public void setCommon(Properties config, Map<String, Object> inParams, String type, boolean edit) {
+
         String name = _parser.getName(inParams, edit).trim();
-        String newName = _parser.getNewName(inParams);
-        if (newName != null)
-            newName = newName.trim();
+        if (_parser.getNewName(inParams) != null)
+            name = _parser.getNewName(inParams).trim();
 
         config.setProperty(TunnelController.PROP_TYPE, type);
-        config.setProperty(TunnelController.PROP_NAME, edit ? newName : name);
+        config.setProperty(TunnelController.PROP_NAME, name);
         config.setProperty(TunnelController.PROP_LISTEN_PORT, Integer.toString(_parser.getPort(inParams)));
         config.setProperty(TunnelController.PROP_START, Boolean.toString(_parser.getStartOnLoad(inParams)));
 
@@ -111,7 +111,10 @@ public class TunnelSupport {
     }
 
     public void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
-        String name = edit ? _parser.getNewName(inParams) : _parser.getName(inParams, false).trim();
+        String name = _parser.getName(inParams, edit).trim();
+        if (_parser.getNewName(inParams) != null)
+            name = _parser.getNewName(inParams).trim();
+
         boolean sharedClient = _parser.getSharedClient(inParams, type);
         if (TunnelController.TYPE_STREAMR_CLIENT.equals(type) || TunnelController.TYPE_HTTP_SERVER.equals(type)) {
             String targetHost = _parser.getTargetHost(inParams);
