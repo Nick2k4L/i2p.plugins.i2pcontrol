@@ -89,8 +89,7 @@ public class TunnelRequestParser {
     }
 
     public String getEncType(Map<String, Object> inParams) {
-        String encType = (String) inParams.get("EncType");
-        return encType != null ? encType : (String) inParams.get("Encrypted");
+        return (String) inParams.get("EncType");
     }
 
     public String getCustomOptions(Map<String, Object> inParams) {
