@@ -12,6 +12,7 @@ import net.i2p.i2ptunnel.TunnelControllerGroup;
 import net.i2p.router.RouterContext;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +20,8 @@ import java.util.Properties;
 
 public class ServiceTunnelCreator {
     private static final String OPT = TunnelController.PFX_OPTION;
+    private static final String LEASE_SET_CLIENT_PSK_PREFIX = OPT + "i2cp.leaseSetClient.psk.";
+    private static final String LEASE_SET_CLIENT_DH_PREFIX = OPT + "i2cp.leaseSetClient.dh.";
     private static final String PROP_STREAMING_CONNECT_DELAY = "i2p.streaming.connectDelay";
     private static final String PROP_REDUCE_ON_IDLE = "i2cp.reduceOnIdle";
     private static final String PROP_REDUCE_QUANTITY = "i2cp.reduceQuantity";
@@ -383,6 +386,55 @@ public class ServiceTunnelCreator {
                 addLeaseSetPrivKey(config, true);
                 config.put(OPT + "i2cp.leaseSetAuthType", "1");
                 break;
+        }
+
+        setLeaseSetClientAuths(config, inParams, encryptMode);
+    }
+
+    private void setLeaseSetClientAuths(Properties config, Map<String, Object> inParams, int encryptMode) {
+        removePropertiesWithPrefix(config, LEASE_SET_CLIENT_PSK_PREFIX);
+        removePropertiesWithPrefix(config, LEASE_SET_CLIENT_DH_PREFIX);
+
+        String prefix = null;
+        if (encryptMode == ENCRYPT_LEASE_SET_PSK_PER_USER ||
+            encryptMode == ENCRYPT_LEASE_SET_PSK_LOOKUP_PER_USER) {
+            prefix = LEASE_SET_CLIENT_PSK_PREFIX;
+        } else if (encryptMode == ENCRYPT_LEASE_SET_DH_PER_USER ||
+                   encryptMode == ENCRYPT_LEASE_SET_DH_LOOKUP_PER_USER) {
+            prefix = LEASE_SET_CLIENT_DH_PREFIX;
+        }
+
+        if (prefix == null)
+            return;
+
+        List<TunnelRequestParser.LeaseSetClientAuth> auths = _parser.getLeaseSetClientAuths(inParams);
+        if (auths.isEmpty())
+            return;
+
+        int index = 0;
+        for (TunnelRequestParser.LeaseSetClientAuth auth : auths) {
+            String name = auth.name != null ? auth.name.trim() : "";
+            String key = auth.key != null ? auth.key.trim() : "";
+            if (name.isEmpty() || key.isEmpty())
+                throw new IllegalArgumentException("LeaseSet client auth entries require Name and Key");
+
+            byte[] decodedKey = Base64.decode(key);
+            if (decodedKey == null || decodedKey.length != 32)
+                throw new IllegalArgumentException("LeaseSet client auth Key must decode to 32 bytes");
+
+            config.setProperty(prefix + index, Base64.encode(DataHelper.getUTF8(name)) + ':' + key);
+            index++;
+        }
+    }
+
+    private void removePropertiesWithPrefix(Properties config, String prefix) {
+        List<Object> keys = new ArrayList<Object>();
+        for (Object key : config.keySet()) {
+            if (key instanceof String && ((String) key).startsWith(prefix))
+                keys.add(key);
+        }
+        for (Object key : keys) {
+            config.remove(key);
         }
     }
 

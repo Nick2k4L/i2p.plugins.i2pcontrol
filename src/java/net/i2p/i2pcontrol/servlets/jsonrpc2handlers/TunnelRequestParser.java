@@ -3,6 +3,9 @@ import net.i2p.crypto.SigType;
 import net.i2p.i2ptunnel.I2PTunnelHTTPClientBase;
 import net.i2p.i2ptunnel.TunnelController;
 import net.i2p.i2ptunnel.TunnelControllerGroup;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 public class TunnelRequestParser {
@@ -373,6 +376,38 @@ public class TunnelRequestParser {
 
     public String getOptionalLookup(Map<String, Object> inParams) {
         return (String) inParams.get("OptionalLookup");
+    }
+
+    public List<LeaseSetClientAuth> getLeaseSetClientAuths(Map<String, Object> inParams) {
+        Object rawAuths = inParams.get("LeaseSetClientAuths");
+        if (rawAuths == null)
+            return Collections.emptyList();
+        if (!(rawAuths instanceof List<?>))
+            throw new IllegalArgumentException("LeaseSetClientAuths must be a list");
+
+        List<LeaseSetClientAuth> auths = new ArrayList<>();
+        for (Object rawAuth : (List<?>) rawAuths) {
+            if (!(rawAuth instanceof Map<?, ?>))
+                throw new IllegalArgumentException("LeaseSetClientAuths entries must be objects");
+
+            Map<?, ?> authMap = (Map<?, ?>) rawAuth;
+            Object nameObj = authMap.containsKey("Name") ? authMap.get("Name") : authMap.get("name");
+            Object keyObj = authMap.containsKey("Key") ? authMap.get("Key") : authMap.get("key");
+            String name = nameObj != null ? nameObj.toString() : null;
+            String key = keyObj != null ? keyObj.toString() : null;
+            auths.add(new LeaseSetClientAuth(name, key));
+        }
+        return auths;
+    }
+
+    public static class LeaseSetClientAuth {
+        public final String name;
+        public final String key;
+
+        public LeaseSetClientAuth(String name, String key) {
+            this.name = name;
+            this.key = key;
+        }
     }
 
     public boolean getBlockAccessInProxies(Map<String, Object> inParams) {
