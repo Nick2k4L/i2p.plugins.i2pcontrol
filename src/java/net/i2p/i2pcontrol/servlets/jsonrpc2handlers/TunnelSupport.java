@@ -106,8 +106,12 @@ public class TunnelSupport {
             config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(_parser.getPort(inParams)));
 
         String description = _parser.getDescription(inParams);
-        if (description != null)
+        if (description != null) {
             config.setProperty(TunnelController.PROP_DESCR, description);
+        }
+        else {
+            config.remove(TunnelController.PROP_DESCR);
+        }
     }
 
     public void setTunnelClientEndpointOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
