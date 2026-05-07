@@ -132,8 +132,12 @@ public class ServiceTunnelCreator {
         config.setProperty(OPT + "outbound.nickname", name);
 
         String description = _parser.getDescription(inParams);
-        if (description != null)
+        if (description != null) {
             config.setProperty(TunnelController.PROP_DESCR, description);
+        }
+        else {
+            config.remove(TunnelController.PROP_DESCR);
+        }
     }
 
     private void setServiceEndpointOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
@@ -284,6 +288,9 @@ public class ServiceTunnelCreator {
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS,
                                Objects.toString(_parser.getUserAgents(inParams)));
         }
+        else {
+            config.remove(OPT + I2PTunnelHTTPServer.OPT_USER_AGENTS);
+        }
 
         config.setProperty(OPT + "shouldBundleReplyInfo", Boolean.toString(multiHoming));
         config.setProperty(OPT + I2PTunnelServer.PROP_UNIQUE_LOCAL,
@@ -297,11 +304,18 @@ public class ServiceTunnelCreator {
         config.setProperty(OPT + PROP_ENABLE_ACCESS_LIST, Boolean.toString("allow".equals(accessMode)));
         config.setProperty(OPT + PROP_ENABLE_BLACKLIST, Boolean.toString("deny".equals(accessMode)));
 
-        if (accessList != null)
+        if (accessList != null){
             setAccessList(accessList, config);
+        }
+        else {
+            config.remove(OPT + "i2cp.accessList");
+        }
 
-        if (filePathFilter != null)
+        if (filePathFilter != null) {
             config.setProperty(TunnelController.PROP_FILTER, filePathFilter);
+        }  else {
+            config.remove(TunnelController.PROP_FILTER);
+        }
     }
 
     private void setEncryptLeaseSetOptions(Properties config, Map<String, Object> inParams) {

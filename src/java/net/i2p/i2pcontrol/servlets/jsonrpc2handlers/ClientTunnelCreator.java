@@ -192,9 +192,12 @@ public class ClientTunnelCreator {
             return;
 
         String jumpList = _parser.getJumpList(inParams);
-        if (jumpList != null)
+        if (jumpList != null){
             config.setProperty(OPT + I2PTunnelHTTPClient.PROP_JUMP_SERVERS,
-                               jumpList.trim().replace("\r\n", ",").replace("\n", ",").replace(" ", ","));
+                               jumpList.trim().replace("\r\n", ",").replace("\n", ",").replace(" ", ","));}
+        else{
+            config.remove(OPT + I2PTunnelHTTPClient.PROP_JUMP_SERVERS);
+        }
     }
 
     private void setTunnelAuthenticationOptions(Properties config, Map<String, Object> inParams, String type) {
