@@ -146,6 +146,8 @@ public class ClientTunnelCreator {
         String proxyList = _parser.getProxyList(inParams);
         if (proxyList != null)
             config.setProperty(TunnelController.PROP_PROXIES, proxyList);
+        else
+            config.remove(TunnelController.PROP_PROXIES);
 
         config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_USE_OUTPROXY_PLUGIN,
                            Boolean.toString(_parser.getUseOutproxyPlugin(inParams)));
@@ -170,6 +172,8 @@ public class ClientTunnelCreator {
             if (sslProxies != null)
                 config.setProperty(OPT + I2PTunnelHTTPClient.PROP_SSL_OUTPROXIES,
                                    sslProxies.trim().replace(" ", ","));
+            else
+                config.remove(OPT + I2PTunnelHTTPClient.PROP_SSL_OUTPROXIES);
         }
     }
 
