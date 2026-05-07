@@ -172,7 +172,7 @@ public class RouterInfoHandler implements RequestHandler {
                     map.put("outproxies", tc.getProxyList());
                     map.put("description", tc.getDescription());
 
-                    map.put("tunnelDestination", tc.getTargetDestination());
+                    map.put("targetDestination", tc.getTargetDestination());
 
 
                     info.add(map);
