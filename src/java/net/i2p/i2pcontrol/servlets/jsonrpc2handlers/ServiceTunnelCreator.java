@@ -151,8 +151,7 @@ public class ServiceTunnelCreator {
             config.setProperty(TunnelController.PROP_FILE, _support.getDefaultPrivateKeyFile());
 
         Integer targetPort = _parser.getTargetPort(inParams);
-        if (targetPort == null)
-            targetPort = _parser.getPort(inParams);
+//
         config.setProperty(TunnelController.PROP_TARGET_PORT, Integer.toString(targetPort));
 
         if (!TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
@@ -428,7 +427,7 @@ public class ServiceTunnelCreator {
     }
 
     private void removePropertiesWithPrefix(Properties config, String prefix) {
-        List<Object> keys = new ArrayList<Object>();
+        List<Object> keys = new ArrayList<>();
         for (Object key : config.keySet()) {
             if (key instanceof String && ((String) key).startsWith(prefix))
                 keys.add(key);
