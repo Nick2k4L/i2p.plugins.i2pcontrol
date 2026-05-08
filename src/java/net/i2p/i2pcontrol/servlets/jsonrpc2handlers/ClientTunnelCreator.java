@@ -82,7 +82,7 @@ public class ClientTunnelCreator {
         setTunnelManagementOptions(config, inParams, type);
         setTunnelFilteringOptions(config, inParams, type);
         setTunnelAddressLookupOptions(config, inParams, type);
-        setTunnelAuthenticationOptions(config, inParams, type);
+        setTunnelAuthenticationOptions(config, inParams, type, edit);
         _support.setTunnelLengthOptions(config, inParams);
         _support.setTunnelQuantityOptions(config, inParams);
         _support.setTunnelCryptographyOptions(config, inParams);
@@ -204,7 +204,7 @@ public class ClientTunnelCreator {
         }
     }
 
-    private void setTunnelAuthenticationOptions(Properties config, Map<String, Object> inParams, String type) {
+    private void setTunnelAuthenticationOptions(Properties config, Map<String, Object> inParams, String type, boolean edit) {
         if (!_parser.isProxyClientType(type))
             return;
 
@@ -215,23 +215,32 @@ public class ClientTunnelCreator {
             if (proxyAuth) {
                 String proxyUsername = _parser.getProxyUsername(inParams);
                 String proxyPassword = _parser.getProxyPassword(inParams);
+                boolean hasProxyUsername = proxyUsername != null && !proxyUsername.trim().isEmpty();
+                boolean hasProxyPassword = proxyPassword != null && !proxyPassword.isEmpty();
 
-                if (proxyUsername == null || proxyPassword == null)
-                    throw new IllegalArgumentException("ProxyUsername and ProxyPassword are required when ProxyAuth is enabled");
-
-                if (TunnelController.TYPE_SOCKS.equals(type) || TunnelController.TYPE_SOCKS_IRC.equals(type)) {
-                    config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
-                                       I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SHA256_SUFFIX,
-                                       PasswordManager.sha256Hex(I2PSOCKSTunnel.AUTH_REALM, proxyUsername, proxyPassword));
+                if (!hasProxyUsername && !hasProxyPassword) {
+                    if (!edit || !hasAnyExistingProxyAuth(config))
+                        throw new IllegalArgumentException("ProxyUsername and ProxyPassword are required when ProxyAuth is enabled");
+                } else if (!hasProxyUsername) {
+                    throw new IllegalArgumentException("ProxyUsername is required when ProxyAuth is enabled");
+                } else if (!hasProxyPassword) {
+                    throw new IllegalArgumentException("ProxyPassword is required when ProxyAuth is enabled");
                 } else {
-                    String realm = TunnelController.TYPE_HTTP_CLIENT.equals(type) ?
-                                   I2PTunnelHTTPClient.AUTH_REALM : I2PTunnelConnectClient.AUTH_REALM;
-                    config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
-                                       I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SUFFIX,
-                                       PasswordManager.md5Hex(realm, proxyUsername, proxyPassword));
-                    config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
-                                       I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SHA256_SUFFIX,
-                                       PasswordManager.sha256Hex(realm, proxyUsername, proxyPassword));
+                    proxyUsername = proxyUsername.trim();
+                    if (TunnelController.TYPE_SOCKS.equals(type) || TunnelController.TYPE_SOCKS_IRC.equals(type)) {
+                        config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
+                                           I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SHA256_SUFFIX,
+                                           PasswordManager.sha256Hex(I2PSOCKSTunnel.AUTH_REALM, proxyUsername, proxyPassword));
+                    } else {
+                        String realm = TunnelController.TYPE_HTTP_CLIENT.equals(type) ?
+                                       I2PTunnelHTTPClient.AUTH_REALM : I2PTunnelConnectClient.AUTH_REALM;
+                        config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
+                                           I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SUFFIX,
+                                           PasswordManager.md5Hex(realm, proxyUsername, proxyPassword));
+                        config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX + proxyUsername +
+                                           I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_SHA256_SUFFIX,
+                                           PasswordManager.sha256Hex(realm, proxyUsername, proxyPassword));
+                    }
                 }
             }
         }
@@ -246,6 +255,15 @@ public class ClientTunnelCreator {
         String outproxyPassword = _parser.getOutproxyPassword(inParams);
         if (outproxyPassword != null)
             config.setProperty(OPT + I2PTunnelHTTPClientBase.PROP_OUTPROXY_PW, outproxyPassword);
+    }
+
+    private boolean hasAnyExistingProxyAuth(Properties config) {
+        String prefix = OPT + I2PTunnelHTTPClientBase.PROP_PROXY_DIGEST_PREFIX;
+        for (Object key : config.keySet()) {
+            if (key instanceof String && ((String) key).startsWith(prefix))
+                return true;
+        }
+        return false;
     }
 
     private void finalizeClientConfig(Properties config, String type) {
