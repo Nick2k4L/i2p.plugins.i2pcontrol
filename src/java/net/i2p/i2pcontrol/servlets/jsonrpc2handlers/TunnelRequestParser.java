@@ -57,10 +57,7 @@ public class TunnelRequestParser {
         Object portObj = inParams.get("Port");
         if (portObj == null)
             throw new IllegalArgumentException("Port is required");
-        int port = ((Number) portObj).intValue();
-        if (port <= 0 || port > 65535)
-            throw new IllegalArgumentException("Port must be between 1 and 65535");
-        return port;
+        return validateInteger("Port", ((Number) portObj).intValue(), 1, 65535);
     }
 
     public boolean getShared(Map<String, Object> inParams) {
@@ -111,7 +108,9 @@ public class TunnelRequestParser {
 
     public Integer getTargetPort(Map<String, Object> inParams) {
         Object targetPortObj = inParams.get("TargetPort");
-        return targetPortObj != null ? ((Number) targetPortObj).intValue() : null;
+        if (targetPortObj == null)
+            throw new IllegalArgumentException("Target Port is required");
+        return validateInteger("TargetPort", ((Number) targetPortObj).intValue(), 1, 65535);
     }
 
     public String getWebsiteHostname(Map<String, Object> inParams) {
@@ -129,22 +128,30 @@ public class TunnelRequestParser {
 
     public Integer getTunnelLength(Map<String, Object> inParams) {
         Object tunnelLengthObj = inParams.get("TunnelLength");
-        return tunnelLengthObj != null ? ((Number) tunnelLengthObj).intValue() : null;
+        if (tunnelLengthObj == null)
+            return null;
+        return validateInteger("TunnelLength", ((Number) tunnelLengthObj).intValue(), 0, 3);
     }
 
     public Integer getTunnelVariance(Map<String, Object> inParams) {
         Object tunnelVarianceObj = inParams.get("TunnelVariance");
-        return tunnelVarianceObj != null ? ((Number) tunnelVarianceObj).intValue() : null;
+        if (tunnelVarianceObj == null)
+            return null;
+        return validateInteger("TunnelVariance", ((Number) tunnelVarianceObj).intValue(), -2, 2);
     }
 
     public Integer getTunnelQuantity(Map<String, Object> inParams) {
         Object tunnelQuantityObj = inParams.get("TunnelQuantity");
-        return tunnelQuantityObj != null ? ((Number) tunnelQuantityObj).intValue() : null;
+        if (tunnelQuantityObj == null)
+            return null;
+        return validateInteger("TunnelQuantity", ((Number) tunnelQuantityObj).intValue(), 1, 6);
     }
 
     public Integer getBackupQuantity(Map<String, Object> inParams) {
         Object backupQuantityObj = inParams.get("TunnelBackupQuantity");
-        return backupQuantityObj != null ? ((Number) backupQuantityObj).intValue() : null;
+        if (backupQuantityObj == null)
+            return null;
+        return validateInteger("TunnelBackupQuantity", ((Number) backupQuantityObj).intValue(), 0, 3);
     }
 
     public boolean getDelayOpen(Map<String, Object> inParams) {
@@ -256,17 +263,23 @@ public class TunnelRequestParser {
 
     public Integer getReduceCount(Map<String, Object> inParams) {
         Object reduceCountObj = inParams.get("ReduceCount");
-        return reduceCountObj != null ? ((Number) reduceCountObj).intValue() : null;
+        if (reduceCountObj == null)
+            return null;
+        return validateInteger("Reduce Count", ((Number) reduceCountObj).intValue(),0, 9);
     }
 
     public Integer getReduceTime(Map<String, Object> inParams) {
         Object reduceTimeObj = inParams.get("ReduceTime");
-        return reduceTimeObj != null ? ((Number) reduceTimeObj).intValue() : null;
+        if (reduceTimeObj == null)
+            return null;
+        return validateInteger("Reduce Time", ((Number) reduceTimeObj).intValue(), 0, 9999);
     }
 
     public Integer getCloseTime(Map<String, Object> inParams) {
         Object closeTimeObj = inParams.get("CloseTime");
-        return closeTimeObj != null ? ((Number) closeTimeObj).intValue() : null;
+        if (closeTimeObj == null)
+            return null;
+        return validateInteger("Close Time", ((Number) closeTimeObj).intValue(), 0, 9999);
     }
 
     public String getPrivKeyFile(Map<String, Object> inParams) {
@@ -448,67 +461,88 @@ public class TunnelRequestParser {
 
     public Integer getMaxConcurrentConns(Map<String, Object> inParams) {
         Object maxConnectionsObj = inParams.get("MaxConcurrentConns");
-        return maxConnectionsObj != null ? ((Number) maxConnectionsObj).intValue() : null;
+        if (maxConnectionsObj == null)
+            return null;
+        return validateInteger("Max Concurrent Connections", ((Number) maxConnectionsObj).intValue(), 0, 100000);
     }
 
     public Integer getClientPerMinute(Map<String, Object> inParams) {
         Object clientPerMinuteObj = inParams.get("ClientPerMinute");
-        return clientPerMinuteObj != null ? ((Number) clientPerMinuteObj).intValue() : null;
+        if (clientPerMinuteObj == null)
+            return null;
+        return validateInteger("Client Per Minute", ((Number) clientPerMinuteObj).intValue(), 0, 100000);
     }
 
     public Integer getClientPerHour(Map<String, Object> inParams) {
         Object clientPerHourObj = inParams.get("ClientPerHour");
-        return clientPerHourObj != null ? ((Number) clientPerHourObj).intValue() : null;
+        if (clientPerHourObj == null)
+            return null;
+        return validateInteger("Client Per Hour", ((Number) clientPerHourObj).intValue(), 0, 100000);
     }
 
     public Integer getClientPerDay(Map<String, Object> inParams) {
         Object clientPerDayObj = inParams.get("ClientPerDay");
-        return clientPerDayObj != null ? ((Number) clientPerDayObj).intValue() : null;
+        if (clientPerDayObj == null)
+            return null;
+        return validateInteger("Client Per Day", ((Number) clientPerDayObj).intValue(), 0, 100000);
     }
 
     public Integer getTotalInPerMinute(Map<String, Object> inParams) {
         Object totalInPerMinuteObj = inParams.get("TotalInPerMinute");
-        return totalInPerMinuteObj != null ? ((Number) totalInPerMinuteObj).intValue() : null;
+        if (totalInPerMinuteObj == null)
+            return null;
+        return validateInteger("Total In Per Minute", ((Number) totalInPerMinuteObj).intValue(), 0, 100000);
     }
 
     public Integer getTotalInPerHour(Map<String, Object> inParams) {
         Object totalInPerHourObj = inParams.get("TotalInPerHour");
-        return totalInPerHourObj != null ? ((Number) totalInPerHourObj).intValue() : null;
+        if (totalInPerHourObj == null)
+            return null;
+        return validateInteger("Total In Per Hour", ((Number) totalInPerHourObj).intValue(), 0, 100000);
     }
 
     public Integer getTotalInPerDay(Map<String, Object> inParams) {
         Object totalInPerDayObj = inParams.get("TotalInPerDay");
-        return totalInPerDayObj != null ? ((Number) totalInPerDayObj).intValue() : null;
+        if (totalInPerDayObj == null)
+            return null;
+        return validateInteger("Total In Per Day", ((Number) totalInPerDayObj).intValue(), 0, 100000);
     }
 
     public Integer getPostLimitPeriod(Map<String, Object> inParams) {
         Object postPeriodObj = inParams.get("PostLimit");
-        return postPeriodObj != null ? ((Number) postPeriodObj).intValue() : null;
+        if (postPeriodObj == null)
+            return null;
+        return validateInteger("Post Limit", ((Number) postPeriodObj).intValue(), 0, 100000);
     }
 
     public Integer getPostBanTime(Map<String, Object> inParams) {
         Object postBanTimeObj = inParams.get("PostLimitTime");
-        return postBanTimeObj != null ? ((Number) postBanTimeObj).intValue() : null;
+        if (postBanTimeObj == null)
+            return null;
+        return validateInteger("Post Limit Time", ((Number) postBanTimeObj).intValue(), 0, 100000);
     }
 
     public Integer getPerClientPeriod(Map<String, Object> inParams) {
         Object perClientPeriodObj = inParams.get("PerClientPeriod");
-        return perClientPeriodObj != null ? ((Number) perClientPeriodObj).intValue() : null;
+        if (perClientPeriodObj == null)
+            return null;
+        return validateInteger("Per Client Period", ((Number) perClientPeriodObj).intValue(), 0, 100000);
     }
 
     public Integer getTotalPeriod(Map<String, Object> inParams) {
         Object totalPeriodObj = inParams.get("TotalPeriod");
-        return totalPeriodObj != null ? ((Number) totalPeriodObj).intValue() : null;
+        if (totalPeriodObj == null)
+            return null;
+        return validateInteger("Total Period", ((Number) totalPeriodObj).intValue(), 0, 100000);
     }
 
     public Integer getTotalBanTime(Map<String, Object> inParams) {
         Object totalBanTimeObj = inParams.get("TotalBanTime");
-        return totalBanTimeObj != null ? ((Number) totalBanTimeObj).intValue() : null;
+        if (totalBanTimeObj == null)
+            return null;
+        return validateInteger("Total Ban Time", ((Number) totalBanTimeObj).intValue(), 0, 100000);
     }
 
-    public String getHostName(Map<String, Object> inParams) {
-        return (String) inParams.get("HostName");
-    }
 
     public String getNormalizedSigType(Map<String, Object> inParams) {
         String sigType = getSigType(inParams);
@@ -534,5 +568,15 @@ public class TunnelRequestParser {
                 return controller;
         }
         return null;
+    }
+
+    private int validateInteger(String arg, int value, int min, int max) {
+        try {
+            if (value < min || value > max)
+                throw new IllegalArgumentException(arg + " must be between " + min + " and " + max);
+            return value;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(arg + " must be an integer");
+        }
     }
 }
