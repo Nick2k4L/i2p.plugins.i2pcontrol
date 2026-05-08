@@ -252,7 +252,6 @@ public class ServiceTunnelCreator {
                            totalInPerDay != null ? Integer.toString(totalInPerDay) : Integer.toString(DEFAULT_MAX_TOTAL_CONNS_DAY));
     }
 
-    // TODO: Remember this is only for STANDARD CLIENT
     private void setProfile(Properties config, Map<String, Object> inParams) {
         String profile = _parser.getProfile(inParams);
         if ("interactive".equals(profile))
