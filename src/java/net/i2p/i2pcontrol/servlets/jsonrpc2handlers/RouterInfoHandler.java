@@ -8,8 +8,12 @@ import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.*;
 
+import net.i2p.I2PAppContext;
+import net.i2p.app.ClientApp;
+import net.i2p.app.ClientAppManager;
 import net.i2p.crypto.Blinding;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
@@ -146,6 +150,22 @@ public class RouterInfoHandler implements RequestHandler {
         if (inParams.containsKey("i2p.router.net.tunnels.participating.info")) {
             outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
         }
+
+        if (inParams.containsKey("i2p.router.news")) {
+            try {
+                Class<?> news = Class.forName("net.i2p.router.web.NewsFeedHelper");
+                Object newsObj = news.getDeclaredConstructor().newInstance();
+                Method method = news.getDeclaredMethod("getEntries", I2PAppContext.class, int.class, int.class, long.class);
+                method.setAccessible(true);
+                Object result = method.invoke(newsObj, I2PAppContext.getCurrentContext(), 0, 0,0);
+                outParams.put("i2p.router.news", result);
+
+            } catch (Exception e) {
+                outParams.put("i2p.router.news", "failure - " + e.getMessage());
+            }
+
+        }
+
 
 
         // Get
