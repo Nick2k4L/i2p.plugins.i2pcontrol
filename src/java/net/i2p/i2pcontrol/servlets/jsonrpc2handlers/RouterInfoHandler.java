@@ -12,8 +12,6 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 import net.i2p.I2PAppContext;
-import net.i2p.app.ClientApp;
-import net.i2p.app.ClientAppManager;
 import net.i2p.crypto.Blinding;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
@@ -267,7 +265,17 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
 
+        if (inParams.containsKey("i2p.router.netdb.bannedpeers")) {
+            // TODO: On newer versions ensure we are doing this instead:
+            //   Map<Hash, Banlist.Entry> banEntries = new HashMap<Hash, Banlist.Entry>(1024);
+            //   _context.banlist().getEntries(banEntries);
+            //   and then return banEntries.
+            //
+            //
+            Map<Hash, Banlist.Entry> banEntries = _context.banlist().getEntries();
 
+            outParams.put("i2p.router.netdb.bannedpeers", banEntries);
+        }
 
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             outParams.put("i2p.router.netdb.knownpeers", Math.max(_context.netDb().getKnownRouters() - 1, 0));
