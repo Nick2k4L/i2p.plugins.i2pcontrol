@@ -26,6 +26,7 @@ import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.networkdb.reseed.ReseedChecker;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
+import net.i2p.router.transport.udp.UDPTransport;
 
 
 /*
@@ -264,6 +265,16 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
         }
 
+        if (inParams.containsKey("i2p.router.netdb.ntcp.limit")) {
+            NTCPTransport ntcp = new NTCPTransport(_context, _context.commSystem().getXDHFactory());
+            outParams.put("i2p.router.netdb.ntcp.limit", ntcp.getMaxConnections());
+        }
+
+        if (inParams.containsKey("i2p.router.netdb.ssu.limit")) {
+           UDPTransport udp = new UDPTransport(_context, _context.commSystem().getXDHFactory());
+           outParams.put("i2p.router.netdb.ssu.limit", udp.getMaxConnections());
+        }
+
 
         if (inParams.containsKey("i2p.router.netdb.bannedpeers")) {
             // TODO: On newer versions ensure we are doing this instead:
@@ -276,7 +287,6 @@ public class RouterInfoHandler implements RequestHandler {
 
             outParams.put("i2p.router.netdb.bannedpeers", banEntries);
         }
-
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             outParams.put("i2p.router.netdb.knownpeers", Math.max(_context.netDb().getKnownRouters() - 1, 0));
         }
