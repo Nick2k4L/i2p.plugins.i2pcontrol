@@ -171,6 +171,10 @@ public class RouterInfoHandler implements RequestHandler {
                     _context.logManager().getBuffer().getMostRecentMessages());
         }
 
+        if (inParams.containsKey("i2p.router.logs.clear")) {
+            _context.logManager().getBuffer().clear();
+             outParams.put("i2p.router.logs.clear", "success");
+        }
 
 
         // Get
