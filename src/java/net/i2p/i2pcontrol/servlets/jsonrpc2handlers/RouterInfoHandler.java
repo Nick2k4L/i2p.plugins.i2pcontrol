@@ -287,13 +287,9 @@ public class RouterInfoHandler implements RequestHandler {
 
 
         if (inParams.containsKey("i2p.router.netdb.bannedpeers")) {
-            // TODO: On newer versions ensure we are doing this instead:
-            //   Map<Hash, Banlist.Entry> banEntries = new HashMap<Hash, Banlist.Entry>(1024);
-            //   _context.banlist().getEntries(banEntries);
-            //   and then return banEntries.
-            //
-            //
-            Map<Hash, Banlist.Entry> banEntries = _context.banlist().getEntries();
+
+            Map<Hash, Banlist.Entry> banEntries = new HashMap<Hash, Banlist.Entry>(1024);
+            _context.banlist().getEntries(banEntries);
 
             outParams.put("i2p.router.netdb.bannedpeers", banEntries);
         }
