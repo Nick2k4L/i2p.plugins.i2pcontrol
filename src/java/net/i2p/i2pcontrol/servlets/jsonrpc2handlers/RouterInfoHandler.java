@@ -177,7 +177,6 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
 
-        // Get
         if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel")){
             TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
             List<Map<String, Object>> info = new ArrayList<>();
