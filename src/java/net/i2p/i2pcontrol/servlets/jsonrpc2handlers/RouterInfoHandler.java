@@ -180,7 +180,6 @@ public class RouterInfoHandler implements RequestHandler {
         // Get
         if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel")){
             TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
-            //TunnelController controller = group.getControllers().get(0);
             List<Map<String, Object>> info = new ArrayList<>();
             for (TunnelController tc : group.getControllers()) {
                 Map<String, Object> map = new HashMap<>();
@@ -207,12 +206,6 @@ public class RouterInfoHandler implements RequestHandler {
                     info.add(map);
             }
             outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
-        }
-
-        if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel.options")) {
-            TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
-            outParams.put("i2p.router.net.tunnels.i2ptunnel.options",
-                          extractTunnelOptions(group, inParams.get("i2p.router.net.tunnels.i2ptunnel.options")));
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
@@ -652,57 +645,6 @@ public class RouterInfoHandler implements RequestHandler {
         } catch (Exception ignored) {}
 
         return null;
-    }
-
-    private Object extractTunnelOptions(TunnelControllerGroup group, Object selector) {
-        if (group == null)
-            return Collections.emptyList();
-        if (selector instanceof String) {
-            TunnelController controller = findTunnelControllerByName(group, ((String) selector).trim());
-            return controller != null ? extractTunnelOptions(controller) : null;
-        }
-        List<Map<String, Object>> info = new ArrayList<>();
-        for (TunnelController controller : group.getControllers()) {
-            info.add(extractTunnelOptions(controller));
-        }
-        return info;
-    }
-
-    private TunnelController findTunnelControllerByName(TunnelControllerGroup group, String name) {
-        for (TunnelController controller : group.getControllers()) {
-            if (controller.getName().equals(name))
-                return controller;
-        }
-        return null;
-    }
-
-    private Map<String, Object> extractTunnelOptions(TunnelController tc) {
-        Map<String, Object> tunnelInfo = new LinkedHashMap<>();
-        Properties config = tc.getConfig("");
-        Map<String, String> rawConfig = new TreeMap<>();
-        Map<String, String> optionConfig = new TreeMap<>();
-        Map<String, String> baseConfig = new TreeMap<>();
-
-        for (Map.Entry<Object, Object> entry : config.entrySet()) {
-            String key = (String) entry.getKey();
-            String value = (String) entry.getValue();
-            rawConfig.put(key, value);
-            if (key.startsWith(TunnelController.PFX_OPTION)) {
-                optionConfig.put(key.substring(TunnelController.PFX_OPTION.length()), value);
-            } else {
-                baseConfig.put(key, value);
-            }
-        }
-
-        tunnelInfo.put("name", tc.getName());
-        tunnelInfo.put("type", tc.getType());
-        tunnelInfo.put("client", tc.isClient());
-        tunnelInfo.put("description", tc.getDescription());
-        tunnelInfo.put("status", getTunnelStatus(tc));
-        tunnelInfo.put("rawConfig", rawConfig);
-        tunnelInfo.put("config", baseConfig);
-        tunnelInfo.put("options", optionConfig);
-        return tunnelInfo;
     }
 
     private static String getTunnelStatus(TunnelController tc) {
