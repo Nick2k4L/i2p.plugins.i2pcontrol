@@ -38,6 +38,20 @@ public class TunnelSupport {
     private static final String PROP_CLOSE_IDLE_TIME = "i2cp.closeIdleTime";
     private static final String SHARED_CLIENT_NICKNAME = "shared clients";
 
+    private static final String DCC_MAX_CONNS_MIN = "3";
+    private static final String DCC_MAX_CONNS_HOUR = "10";
+    private static final String DCC_MAX_TOTAL_CONNS_MIN = "5";
+    private static final String DCC_MAX_TOTAL_CONNS_HOUR = "25";
+
+    protected final String PROP_DELAY_DEFAULT_ACTIVE = "500";
+    protected final String PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE = "16";
+    protected final String MLKEM768_ECIES_ENC_TYPE = "6,4";
+    protected final String ECIES_ELGAMAL_ENC_TYPE = "0,4";
+
+
+    protected final int MS_PER_MINUTE = 60 * 1000;
+    protected final int S_PER_MINUTE = 60;
+
     private static final String[] NO_SHOW_OPTS = {
         "inbound.length", "outbound.length", "inbound.lengthVariance", "outbound.lengthVariance",
         "inbound.backupQuantity", "outbound.backupQuantity", "inbound.quantity", "outbound.quantity",
@@ -141,10 +155,10 @@ public class TunnelSupport {
             boolean dcc = _parser.getDCC(inParams);
             config.setProperty(OPT + I2PTunnelIRCClient.PROP_DCC, Boolean.toString(dcc));
             if (dcc) {
-                config.setProperty(OPT + TunnelController.PROP_MAX_CONNS_MIN, "3");
-                config.setProperty(OPT + TunnelController.PROP_MAX_CONNS_HOUR, "10");
-                config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_MIN, "5");
-                config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_HOUR, "25");
+                config.setProperty(OPT + TunnelController.PROP_MAX_CONNS_MIN, DCC_MAX_CONNS_MIN);
+                config.setProperty(OPT + TunnelController.PROP_MAX_CONNS_HOUR, DCC_MAX_CONNS_HOUR);
+                config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_MIN, DCC_MAX_TOTAL_CONNS_MIN);
+                config.setProperty(OPT + TunnelController.PROP_MAX_TOTAL_CONNS_HOUR, DCC_MAX_TOTAL_CONNS_HOUR);
             }
         }
     }
