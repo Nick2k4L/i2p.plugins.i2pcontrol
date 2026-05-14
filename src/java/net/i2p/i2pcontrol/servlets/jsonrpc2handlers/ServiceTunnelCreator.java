@@ -36,6 +36,8 @@ public class ServiceTunnelCreator {
     private static final String PROP_ENABLE_ACCESS_LIST = "i2cp.enableAccessList";
     private static final String PROP_ENABLE_BLACKLIST = "i2cp.enableBlackList";
 
+    private static final String ECIES_ENC_TYPE = "4";
+
     private static final int ENCRYPT_LEASE_SET_DISABLE = 0;
     private static final int ENCRYPT_LEASE_SET_AES = 1;
     private static final int ENCRYPT_LEASE_SET_BLINDED = 2;
@@ -125,7 +127,7 @@ public class ServiceTunnelCreator {
 
         if (type.equals(TunnelController.TYPE_STD_CLIENT)) {
             config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY,
-                    _parser.getConnectDelay(inParams) ? "500" : "0");
+                    _parser.getConnectDelay(inParams) ? _support.PROP_DELAY_DEFAULT_ACTIVE : "0");
         }
         // explicitly set to zero for everything else
         else {
@@ -210,11 +212,11 @@ public class ServiceTunnelCreator {
         Integer totalPeriod = _parser.getTotalPeriod(inParams);
 
         if (postLimitPeriod != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, Integer.toString(postLimitPeriod * 60));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_WINDOW, Integer.toString(postLimitPeriod * _support.S_PER_MINUTE));
         if (postBanTime != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime * 60));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_BAN_TIME, Integer.toString(postBanTime * _support.S_PER_MINUTE));
         if (totalBanTime != null)
-            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime * 60));
+            config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_BAN_TIME, Integer.toString(totalBanTime * _support.S_PER_MINUTE));
         if (totalPeriod != null)
             config.setProperty(OPT + I2PTunnelHTTPServer.OPT_POST_TOTAL_MAX, Integer.toString(totalPeriod));
         if (perClientPeriod != null)
@@ -255,7 +257,7 @@ public class ServiceTunnelCreator {
     private void setProfile(Properties config, Map<String, Object> inParams) {
         String profile = _parser.getProfile(inParams);
         if ("interactive".equals(profile))
-            config.setProperty(OPT + "i2p.streaming.maxWindowSize", "16");
+            config.setProperty(OPT + "i2p.streaming.maxWindowSize", _support.PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE);
         else
             config.remove(OPT + "i2p.streaming.maxWindowSize");
     }
@@ -266,7 +268,7 @@ public class ServiceTunnelCreator {
         if (reduceCount != null)
             config.setProperty(OPT + PROP_REDUCE_QUANTITY, Integer.toString(reduceCount));
         if (reduceTime != null)
-            config.setProperty(OPT + PROP_REDUCE_IDLE_TIME, Integer.toString(reduceTime * 60 * 1000));
+            config.setProperty(OPT + PROP_REDUCE_IDLE_TIME, Integer.toString(reduceTime * _support.MS_PER_MINUTE));
     }
 
     private void setReduce(Properties config, Map<String, Object> inParams) {
@@ -463,11 +465,11 @@ public class ServiceTunnelCreator {
         }
         if (TunnelController.TYPE_HTTP_SERVER.equals(type) ||
             TunnelController.TYPE_STREAMR_SERVER.equals(type)) {
-            return "6,4";
+            return _support.MLKEM768_ECIES_ENC_TYPE;
         }
         if (TunnelController.TYPE_IRC_SERVER.equals(type))
-            return "4";
-        return "4,0";
+            return ECIES_ENC_TYPE;
+        return _support.ECIES_ELGAMAL_ENC_TYPE;
     }
 
     private void validateBlindedSigType(Properties config) {
