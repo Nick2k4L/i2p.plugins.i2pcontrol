@@ -20,6 +20,8 @@ final class TunnelInfoHelper {
     private static final String ROLE_OUTBOUND_ENDPOINT = "outbound endpoint";
     private static final String ROLE_PARTICIPANT = "participant";
 
+    private static final int PERIOD = 10 * 60 * 1000;
+
     private final RouterContext _context;
 
     TunnelInfoHelper(RouterContext context) {
@@ -48,7 +50,7 @@ final class TunnelInfoHelper {
         inactiveInfo.put("inactiveCount", inactiveCount);
         Map<String, Object> totalInfo = new HashMap<>();
         RateStat rs = _context.statManager().getRate("tunnel.participatingMessageCount");
-        totalInfo.put("bandwidth", rs != null ? rs.getRate(10*60*1000).getLifetimeTotalValue() : 0L);
+        totalInfo.put("bandwidth", rs != null ? rs.getRate(PERIOD).getLifetimeTotalValue() : 0L);
         participatingTunnels.add(inactiveInfo);
         participatingTunnels.add(totalInfo);
         return participatingTunnels;
