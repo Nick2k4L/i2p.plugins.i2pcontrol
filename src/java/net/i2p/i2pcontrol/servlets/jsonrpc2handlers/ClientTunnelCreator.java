@@ -104,11 +104,11 @@ public class ClientTunnelCreator {
         Integer reduceTime = _parser.getReduceTime(inParams);
         Integer closeTime = _parser.getCloseTime(inParams);
 
-        config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY, _parser.getConnectDelay(inParams) ? "500" : "0");
+        config.setProperty(OPT + PROP_STREAMING_CONNECT_DELAY, _parser.getConnectDelay(inParams) ? _support.PROP_DELAY_DEFAULT_ACTIVE : "0");
 
         String profile = _parser.getProfile(inParams);
         if ("interactive".equals(profile))
-            config.setProperty(OPT + PROP_STREAMING_MAX_WINDOW_SIZE, "16");
+            config.setProperty(OPT + PROP_STREAMING_MAX_WINDOW_SIZE, _support.PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE );
         else
             config.remove(OPT + PROP_STREAMING_MAX_WINDOW_SIZE);
 
@@ -124,10 +124,10 @@ public class ClientTunnelCreator {
             config.setProperty(OPT + PROP_REDUCE_QUANTITY, Integer.toString(reduceCount));
 
         if (reduceTime != null)
-            config.setProperty(OPT + PROP_REDUCE_IDLE_TIME, Integer.toString(reduceTime * 60 * 1000));
+            config.setProperty(OPT + PROP_REDUCE_IDLE_TIME, Integer.toString(reduceTime * _support.MS_PER_MINUTE));
 
         if (closeTime != null)
-            config.setProperty(OPT + PROP_CLOSE_IDLE_TIME, Integer.toString(closeTime * 60 * 1000));
+            config.setProperty(OPT + PROP_CLOSE_IDLE_TIME, Integer.toString(closeTime * _support.MS_PER_MINUTE));
 
         String privKeyFile = _parser.getPrivKeyFile(inParams);
         if (privKeyFile != null && persistentClientKey)
@@ -346,7 +346,7 @@ public class ClientTunnelCreator {
                 return encTypes;
         }
         if (type != null && type.contains("irc"))
-            return "6,4";
-        return "4,0";
+            return _support.MLKEM768_ECIES_ENC_TYPE;
+        return _support.ECIES_ELGAMAL_ENC_TYPE;
     }
 }
