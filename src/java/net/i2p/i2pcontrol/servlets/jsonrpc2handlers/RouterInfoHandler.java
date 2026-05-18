@@ -268,7 +268,7 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("i2p.router.netdb.ntcp.limit")) {
-            outParams.put("i2p.router.netdb.ntcp", getTransportLimit(_context, "NTCP"));
+            outParams.put("i2p.router.netdb.ntcp.limit", getTransportLimit(_context, "NTCP"));
         }
 
         if (inParams.containsKey("i2p.router.netdb.ssu.limit")) {
