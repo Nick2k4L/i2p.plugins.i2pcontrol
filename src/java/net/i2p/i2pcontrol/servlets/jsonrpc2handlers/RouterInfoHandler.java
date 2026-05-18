@@ -24,9 +24,9 @@ import net.i2p.i2ptunnel.TunnelControllerGroup;
 import net.i2p.router.*;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
 import net.i2p.router.networkdb.reseed.ReseedChecker;
+import net.i2p.router.transport.Transport;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
-import net.i2p.router.transport.udp.UDPTransport;
 
 
 /*
@@ -268,13 +268,11 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("i2p.router.netdb.ntcp.limit")) {
-            NTCPTransport ntcp = new NTCPTransport(_context, _context.commSystem().getXDHFactory());
-            outParams.put("i2p.router.netdb.ntcp.limit", ntcp.getMaxConnections());
+            outParams.put("i2p.router.netdb.ntcp", getTransportLimit(_context, "NTCP"));
         }
 
         if (inParams.containsKey("i2p.router.netdb.ssu.limit")) {
-           UDPTransport udp = new UDPTransport(_context, _context.commSystem().getXDHFactory());
-           outParams.put("i2p.router.netdb.ssu.limit", udp.getMaxConnections());
+            outParams.put("i2p.router.netdb.ssu.limit", getTransportLimit(_context, "SSU"));
         }
 
 
@@ -505,6 +503,22 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         return new JSONRPC2Response(outParams, req.getID());
+    }
+
+    // transports limit. Supports SSU / NTCP
+    private static int getTransportLimit(RouterContext context, String type) {
+        SortedMap<String, Transport> transport = context.commSystem().getTransports();
+        int maxConns = 0;
+
+        if (!transport.isEmpty())
+        {
+            for (Transport t : transport.values()) {
+                if (t.getStyle().equals(type)) {
+                    maxConns = t.getMaxConnections();
+                }
+            }
+        }
+        return maxConns;
     }
 
     private static String getEncryptedBase32(TunnelController tc) {
