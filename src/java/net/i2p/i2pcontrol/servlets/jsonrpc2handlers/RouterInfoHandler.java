@@ -277,12 +277,29 @@ public class RouterInfoHandler implements RequestHandler {
 
 
         if (inParams.containsKey("i2p.router.netdb.bannedpeers")) {
-
-            Map<Hash, Banlist.Entry> banEntries = new HashMap<Hash, Banlist.Entry>(1024);
+            Map<Hash, Banlist.Entry> banEntries = new HashMap<>(1024);
+            Map<String, Map<String, Object>> entries = new HashMap<>(1024);
             _context.banlist().getEntries(banEntries);
+            try {
+                for (Map.Entry<Hash, Banlist.Entry> e : banEntries.entrySet()) {
+                    // expose all the entries safely.
+                    if (e.getValue() != null){
+                        Map<String, Object> entryDetails = new HashMap<>();
+                        entryDetails.put("expireOn", e.getValue().expireOn);
+                        entryDetails.put("cause", e.getValue().cause);
+                        entryDetails.put("causeCode", e.getValue().causeCode);
+                        entryDetails.put("transports", e.getValue().transports);
+                        entries.put(e.getKey().toBase64(), entryDetails);
+                    }
 
-            outParams.put("i2p.router.netdb.bannedpeers", banEntries);
+                }
+                outParams.put("i2p.router.netdb.bannedpeers", entries);
+            } catch (Exception ex) {
+                outParams.put("i2p.router.netdb.bannedpeers", Collections.emptyMap());
+            }
+
         }
+
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             outParams.put("i2p.router.netdb.knownpeers", Math.max(_context.netDb().getKnownRouters() - 1, 0));
         }
