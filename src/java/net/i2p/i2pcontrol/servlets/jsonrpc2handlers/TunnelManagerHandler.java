@@ -41,7 +41,7 @@ public class TunnelManagerHandler implements RequestHandler {
             return new JSONRPC2Response(JSONRPC2Error.METHOD_NOT_FOUND, req.getID());
 
         Map<String, Object> inParams = req.getNamedParams();
-        JSONRPC2Error err = _helper.validateParams(REQUIRED_ARGS, req, JSONRPC2Helper.USE_NO_AUTH);
+        JSONRPC2Error err = _helper.validateParams(REQUIRED_ARGS, req, JSONRPC2Helper.USE_AUTH);
         if (err != null)
             return new JSONRPC2Response(err, req.getID());
 
