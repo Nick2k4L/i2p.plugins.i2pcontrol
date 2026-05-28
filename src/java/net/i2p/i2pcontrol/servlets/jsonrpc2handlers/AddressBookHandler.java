@@ -56,7 +56,7 @@ public class AddressBookHandler implements RequestHandler {
             if (fileResponse != null)
                 return fileResponse;
 
-            JSONRPC2Error err = _helper.validateParams(requiredArgs, req, JSONRPC2Helper.USE_NO_AUTH);
+            JSONRPC2Error err = _helper.validateParams(requiredArgs, req, JSONRPC2Helper.USE_AUTH);
             if (err != null)
                 return new JSONRPC2Response(err, req.getID());
 
