@@ -25,12 +25,12 @@ public class TunnelManagerHandler implements RequestHandler {
     private static final String[] REQUIRED_ARGS = {"Name", "Action"};
     private final JSONRPC2Helper _helper;
     private final RouterContext _context;
-    private final TunnelControllerGroup _group;
+    private volatile TunnelControllerGroup _group;
+
 
     public TunnelManagerHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _context = ctx;
         _helper = helper;
-        _group = TunnelControllerGroup.getInstance();
     }
 
     public String[] handledRequests() {
@@ -49,6 +49,14 @@ public class TunnelManagerHandler implements RequestHandler {
         String name = (String) inParams.get("Name");
         String action = (String) inParams.get("Action");
         Map<String, Object> outParams = new HashMap<>();
+
+        if (_group == null) {
+            synchronized (this) {
+                if (_group == null) {
+                    _group = TunnelControllerGroup.getInstance(_context);
+                }
+            }
+        }
 
         if (_group == null) {
             outParams.put("status", "error - tunnel controller not available, group is null");
