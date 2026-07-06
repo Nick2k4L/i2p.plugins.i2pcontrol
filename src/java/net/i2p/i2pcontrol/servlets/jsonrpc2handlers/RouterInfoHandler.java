@@ -8,19 +8,23 @@ import com.thetransactioncompany.jsonrpc2.server.RequestHandler;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.*;
 
+import net.i2p.I2PAppContext;
+import net.i2p.crypto.Blinding;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 import net.i2p.data.router.RouterAddress;
 import net.i2p.data.router.RouterInfo;
-import net.i2p.router.CommSystemFacade;
-import net.i2p.router.Router;
-import net.i2p.router.RouterContext;
-import net.i2p.router.RouterVersion;
+import net.i2p.i2ptunnel.TunnelController;
+import net.i2p.i2ptunnel.TunnelControllerGroup;
+import net.i2p.router.*;
 import net.i2p.router.networkdb.kademlia.FloodfillNetworkDatabaseFacade;
+import net.i2p.router.networkdb.reseed.ReseedChecker;
+import net.i2p.router.transport.Transport;
 import net.i2p.router.transport.TransportUtil;
 import net.i2p.router.transport.ntcp.NTCPTransport;
 
@@ -45,11 +49,13 @@ public class RouterInfoHandler implements RequestHandler {
     private final JSONRPC2Helper _helper;
     private final RouterContext _context;
     private final AddressBookFiles _files;
+    private final TunnelInfoHelper _tunnelInfoHelper;
 
     public RouterInfoHandler(RouterContext ctx, JSONRPC2Helper helper) {
         _helper = helper;
         _context = ctx;
         _files = new AddressBookFiles(ctx);
+        _tunnelInfoHelper = new TunnelInfoHelper(ctx);
     }
 
     public String[] handledRequests() {
@@ -108,6 +114,14 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.status", getNetworkStatus().ordinal());
         }
 
+        if (inParams.containsKey("i2p.router.net.bw.used.inbound.total")){
+            outParams.put("i2p.router.net.bw.used.inbound.total", _context.bandwidthLimiter().getTotalAllocatedInboundBytes());
+        }
+
+        if (inParams.containsKey("i2p.router.net.bw.used.outbound.total")){
+            outParams.put("i2p.router.net.bw.used.outbound.total", _context.bandwidthLimiter().getTotalAllocatedOutboundBytes());
+        }
+
         if (inParams.containsKey("i2p.router.net.bw.inbound.1s")) {
             outParams.put("i2p.router.net.bw.inbound.1s", _context.bandwidthLimiter().getReceiveBps());
         }
@@ -124,46 +138,120 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.net.bw.outbound.15s", _context.bandwidthLimiter().getSendBps15s());
         }
 
+        if (inParams.containsKey("i2p.router.net.tunnels.shareratio")) {
+            outParams.put("i2p.router.net.tunnels.shareratio", _context.tunnelManager().getShareRatio());
+        }
+
         if (inParams.containsKey("i2p.router.net.tunnels.participating")) {
-            outParams.put("i2p.router.net.tunnels.participating", _context.tunnelManager().getParticipatingCount());
+            outParams.put("i2p.router.net.tunnels.participating", _tunnelInfoHelper.getParticipatingCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.participating.info")) {
+            outParams.put("i2p.router.net.tunnels.participating.info", _tunnelInfoHelper.getParticipatingInfo());
+        }
+
+        if (inParams.containsKey("i2p.router.news")) {
+            try {
+                Class<?> news = Class.forName("net.i2p.router.web.NewsFeedHelper");
+                Object newsObj = news.getDeclaredConstructor().newInstance();
+                Method method = news.getDeclaredMethod("getEntries", I2PAppContext.class, int.class, int.class, long.class);
+                method.setAccessible(true);
+                Object result = method.invoke(newsObj, I2PAppContext.getCurrentContext(), 0, 0,0);
+                outParams.put("i2p.router.news", result);
+
+            } catch (Exception e) {
+                outParams.put("i2p.router.news", "failure - " + e.getMessage());
+            }
+
+        }
+
+        if (inParams.containsKey("i2p.router.logs")) {
+            _context.logManager().flush();
+            outParams.put("i2p.router.logs",
+                    _context.logManager().getBuffer().getMostRecentMessages());
+        }
+
+        if (inParams.containsKey("i2p.router.logs.clear")) {
+            _context.logManager().getBuffer().clear();
+             outParams.put("i2p.router.logs.clear", "success");
+        }
+
+
+        if (inParams.containsKey("i2p.router.net.tunnels.i2ptunnel")){
+            TunnelControllerGroup group = TunnelControllerGroup.getInstance(_context);
+            List<Map<String, Object>> info = new ArrayList<>();
+            for (TunnelController tc : group.getControllers()) {
+                Map<String, Object> map = new HashMap<>();
+                    map.put("name", tc.getName());
+                    map.put("type", tc.getType());
+                    map.put("interface", tc.getListenOnInterface());
+                    map.put("port", tc.getListenPort());
+                    map.put("targetHost", tc.getTargetHost());
+                    map.put("targetPort", tc.getTargetPort());
+                    map.put("status", getTunnelStatus(tc));
+
+                    map.put("isClient", tc.isClient());
+                    map.put("hostname", tc.getSpoofedHost());
+                    map.put("destination", tc.getMyDestHashBase32());
+                    map.put("encrypted", getEncryptedBase32(tc));
+                    map.put("ssl", tc.getClientOptionProps().getProperty("useSSL", "false").equals("true"));
+                    map.put("sharedClient", tc.getSharedClient());
+                    map.put("outproxies", tc.getProxyList());
+                    map.put("description", tc.getDescription());
+
+                    map.put("targetDestination", tc.getTargetDestination());
+
+
+                    info.add(map);
+            }
+            outParams.put("i2p.router.net.tunnels.i2ptunnel", info);
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.inbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.inbound",
-                    _context.tunnelManager().getFreeTunnelCount());
+                          _tunnelInfoHelper.getExploratoryInboundCount());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.exploratory.outbound")) {
             outParams.put("i2p.router.net.tunnels.exploratory.outbound",
-                    _context.tunnelManager().getOutboundTunnelCount());
+                          _tunnelInfoHelper.getExploratoryOutboundCount());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.exploratory.info.list")) {
+            outParams.put("i2p.router.net.tunnels.exploratory.info.list", _tunnelInfoHelper.getExploratoryInfo());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.inbound")) {
             outParams.put("i2p.router.net.tunnels.client.inbound",
-                    _context.tunnelManager().getInboundClientTunnelCount());
+                          _tunnelInfoHelper.getClientInboundCount());
         }
 
         if (inParams.containsKey("i2p.router.net.tunnels.client.outbound")) {
             outParams.put("i2p.router.net.tunnels.client.outbound",
-                    _context.tunnelManager().getOutboundClientTunnelCount());
+                          _tunnelInfoHelper.getClientOutboundCount());
         }
 
-        if (inParams.containsKey("i2p.router.netdb.peers")) {
+        if (inParams.containsKey("i2p.router.net.tunnels.client.info.list")) {
+            outParams.put("i2p.router.net.tunnels.client.info.list", _tunnelInfoHelper.getClientInfo());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.inbound.list")) {
+            outParams.put("i2p.router.net.tunnels.client.inbound.list",
+                          _tunnelInfoHelper.getClientInboundList());
+        }
+
+        if (inParams.containsKey("i2p.router.net.tunnels.client.outbound.list")) {
+            outParams.put("i2p.router.net.tunnels.client.outbound.list",
+                          _tunnelInfoHelper.getClientOutboundList());
+        }
+
+            if (inParams.containsKey("i2p.router.netdb.peers")) {
             Set<Hash> allRouters = _context.netDb().getAllRouters();
             List<String> peerList = new ArrayList<>();
             for (Hash h : allRouters) {
                 peerList.add(h.toBase64());
             }
             outParams.put("i2p.router.netdb.peers", peerList);
-        }
-
-        if (inParams.containsKey("i2p.router.netdb.activepeers.list")) {
-            List<Hash> active = _context.commSystem().getEstablished();
-            List<String> peerList = new ArrayList<>();
-            for (Hash h : active) {
-                peerList.add(h.toBase64());
-            }
-            outParams.put("i2p.router.netdb.activepeers.list", peerList);
         }
 
         if (inParams.containsKey("i2p.router.netdb.activepeers.info")) {
@@ -179,6 +267,38 @@ public class RouterInfoHandler implements RequestHandler {
             outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
         }
 
+        if (inParams.containsKey("i2p.router.netdb.ntcp.limit")) {
+            outParams.put("i2p.router.netdb.ntcp.limit", getTransportLimit(_context, "NTCP"));
+        }
+
+        if (inParams.containsKey("i2p.router.netdb.ssu.limit")) {
+            outParams.put("i2p.router.netdb.ssu.limit", getTransportLimit(_context, "SSU"));
+        }
+
+
+        if (inParams.containsKey("i2p.router.netdb.bannedpeers")) {
+            Map<Hash, Banlist.Entry> banEntries = new HashMap<>(1024);
+            Map<String, Map<String, Object>> entries = new HashMap<>(1024);
+            _context.banlist().getEntries(banEntries);
+            try {
+                for (Map.Entry<Hash, Banlist.Entry> e : banEntries.entrySet()) {
+                    // expose all the entries safely.
+                    if (e.getValue() != null){
+                        Map<String, Object> entryDetails = new HashMap<>();
+                        entryDetails.put("expireOn", e.getValue().expireOn);
+                        entryDetails.put("cause", e.getValue().cause);
+                        entryDetails.put("causeCode", e.getValue().causeCode);
+                        entryDetails.put("transports", e.getValue().transports);
+                        entries.put(e.getKey().toBase64(), entryDetails);
+                    }
+
+                }
+                outParams.put("i2p.router.netdb.bannedpeers", entries);
+            } catch (Exception ex) {
+                outParams.put("i2p.router.netdb.bannedpeers", Collections.emptyMap());
+            }
+
+        }
 
         if (inParams.containsKey("i2p.router.netdb.knownpeers")) {
             outParams.put("i2p.router.netdb.knownpeers", Math.max(_context.netDb().getKnownRouters() - 1, 0));
@@ -197,7 +317,8 @@ public class RouterInfoHandler implements RequestHandler {
         }
 
         if (inParams.containsKey("i2p.router.netdb.isreseeding")) {
-            outParams.put("i2p.router.netdb.isreseeding", Boolean.valueOf(System.getProperty("net.i2p.router.web.ReseedHandler.reseedInProgress")).booleanValue());
+            ReseedChecker _reseedChecker = _context.netDb().reseedChecker();
+            outParams.put("i2p.router.netdb.isreseeding", _reseedChecker.inProgress());
         }
 
         if (inParams.containsKey("i2p.router.id")) {
@@ -230,16 +351,6 @@ public class RouterInfoHandler implements RequestHandler {
             List<String> peerList = new ArrayList<>();
             for (Hash h : active) peerList.add(h.toBase64());
             outParams.put("i2p.router.netdb.activepeers.list", peerList);
-        }
-
-        if (inParams.containsKey("i2p.router.netdb.activepeers.info")) {
-            List<Hash> active = _context.commSystem().getEstablished();
-            List<String> peerInfoList = new ArrayList<>();
-            for (Hash h : active) {
-                RouterInfo ri = _context.netDb().lookupRouterInfoLocally(h);
-                if (ri != null) peerInfoList.add(Base64.encode(ri.toByteArray()));
-            }
-            outParams.put("i2p.router.netdb.activepeers.info", peerInfoList);
         }
 
         if (inParams.containsKey("i2p.router.netdb.peers.list")) {
@@ -401,6 +512,72 @@ public class RouterInfoHandler implements RequestHandler {
         return new JSONRPC2Response(outParams, req.getID());
     }
 
+    // transports limit. Supports SSU / NTCP
+    private static int getTransportLimit(RouterContext context, String type) {
+        SortedMap<String, Transport> transport = context.commSystem().getTransports();
+        int maxConns = 0;
+
+        if (!transport.isEmpty())
+        {
+            for (Transport t : transport.values()) {
+                if (t.getStyle().equals(type)) {
+                    maxConns = t.getMaxConnections();
+                }
+            }
+        }
+        return maxConns;
+    }
+
+    private static String getEncryptedBase32(TunnelController tc) {
+        Destination dest = tc.getDestination(); // running tunnels only
+        if (dest == null)
+            return "";
+
+        Properties opts = tc.getClientOptionProps();
+        int mode = getEncryptMode(opts);
+
+        // Matches IndexBean: only blinded LS2 modes have a encrypted b32 address.
+        if (mode > 1 && mode < 10) {
+            boolean hasSecret = !opts.getProperty("i2cp.leaseSetSecret", "").isEmpty();
+            boolean requireSecret = hasSecret && (mode == 3 || mode == 5 || mode == 7 || mode == 9);
+            boolean requireAuth = mode >= 4;
+
+            return Blinding.encode(dest.getSigningPublicKey(), requireSecret, requireAuth);
+        }
+
+        return "";
+    }
+
+    // used indexBean & general helper as a reference, similar logic
+    private static int getEncryptMode(Properties opts) {
+        if (Boolean.parseBoolean(opts.getProperty("i2cp.encryptLeaseSet")))
+            return 1;
+
+        String leaseSetType = opts.getProperty("i2cp.leaseSetType", "1");
+        if ("5".equals(leaseSetType)) {
+            int mode;
+            String authType = opts.getProperty("i2cp.leaseSetAuthType", "0");
+
+            if ("2".equals(authType)) {
+                mode = opts.getProperty("i2cp.leaseSetClient.psk.0") != null ? 6 : 4;
+            } else if ("1".equals(authType)) {
+                mode = 8;
+            } else {
+                mode = 2;
+            }
+
+            if (!opts.getProperty("i2cp.leaseSetSecret", "").isEmpty())
+                mode++;
+
+            return mode;
+        }
+
+        if ("3".equals(leaseSetType))
+            return 10;
+
+        return 0;
+    }
+
 
 
     private List<Map<String, String>> extractDestinations(Properties opts) {
@@ -488,6 +665,13 @@ public class RouterInfoHandler implements RequestHandler {
         } catch (Exception ignored) {}
 
         return null;
+    }
+
+    private static String getTunnelStatus(TunnelController tc) {
+        if (tc.getIsStandby()) return "standby";
+        if (tc.getIsRunning()) return "running";
+        if (tc.getIsStarting())  return "starting";
+        return "stopped";
     }
 
 

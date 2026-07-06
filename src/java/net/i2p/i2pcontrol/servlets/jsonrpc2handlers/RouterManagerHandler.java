@@ -144,8 +144,7 @@ public class RouterManagerHandler implements RequestHandler {
             (new Thread() {
                 @Override
                 public void run() {
-                    ReseedChecker reseeder = new ReseedChecker(_context);
-                    reseeder.requestReseed();
+                    _context.netDb().reseedChecker().requestReseed();
                 }
             }).start();
             return new JSONRPC2Response(outParams, req.getID());

@@ -20,6 +20,7 @@ import com.thetransactioncompany.jsonrpc2.*;
 import com.thetransactioncompany.jsonrpc2.server.Dispatcher;
 
 import net.i2p.I2PAppContext;
+import net.i2p.i2pcontrol.servlets.jsonrpc2handlers.AddressBookHandler;
 import net.i2p.router.RouterContext;
 import net.i2p.util.Log;
 import net.i2p.util.PortMapper;
@@ -112,6 +113,8 @@ public class JSONRPC2Servlet extends HttpServlet {
         disp.register(new RouterManagerHandler(_context, _helper));
         disp.register(new I2PControlHandler(_context, _helper, _secMan));
         disp.register(new AdvancedSettingsHandler(_context, _helper));
+        disp.register(new AddressBookHandler(_context, _helper));
+        disp.register(new TunnelManagerHandler(_context, _helper));
         if (_isWebapp) {
             PortMapper pm = _context.portMapper();
             int port = pm.getPort(PortMapper.SVC_CONSOLE);
